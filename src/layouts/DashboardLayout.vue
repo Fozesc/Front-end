@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import { ShieldCheck } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { 
   LayoutDashboard, 
@@ -17,16 +18,17 @@ import {
 } from 'lucide-vue-next';
 
 const route = useRoute();
-const isMobileSidebarOpen = ref(false); // Controla mobile (overlay)
-const isSidebarCollapsed = ref(false);  // Controla desktop (recolher)
+const isMobileSidebarOpen = ref(false);
+const isSidebarCollapsed = ref(false);  
 
-// Itens do Menu (Exatamente como você pediu)
+
 const navigation = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Cheques', path: '/cheques', icon: Banknote },
   { name: 'Borderô', path: '/bordero', icon: Calculator },
   { name: 'Clientes', path: '/clientes', icon: Users },
   { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
+  { name: 'Auditoria', path: '/auditoria', icon: ShieldCheck }
 ];
 
 const toggleMobileSidebar = () => {
