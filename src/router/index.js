@@ -7,6 +7,7 @@ import FluxoCaixaView from '../views/FluxoCaixaView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import LoginView from '../views/LoginView.vue'
 import ConfiguracoesView from '../views/ConfiguracoesView.vue'
+import AuditView from '../views/AuditView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,6 +51,11 @@ const router = createRouter({
     path: '/configuracoes',
     name: 'configuracoes',
     component: ConfiguracoesView
+  },
+  {
+  path: '/auditoria',
+  name: 'auditoria',
+  component: AuditView
   }
     
   ]
