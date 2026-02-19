@@ -1,26 +1,20 @@
 import api from './api';
 
 export default {
+  getAll(params) {
 
-  async getAll(filters = {}) {
-    const params = new URLSearchParams(filters).toString();
-    const response = await api.get(`/checks?${params}`);
-    return response.data;
+    return api.get('/checks/', { params }).then(res => res.data);
   },
-
-  async updateStatus(id, status) {
-
-    const response = await api.patch(`/checks/${id}/status`, { status });
-    return response.data;
+  getPortfolioTotal() {
+    return api.get('/checks/portfolio-total').then(res => res.data);
   },
-
-  async update(id, checkData) {
-    const response = await api.put(`/checks/${id}`, checkData);
-    return response.data;
+  updateStatus(id, status, paymentData = null) {
+    return api.patch(`/checks/${id}/status`, { status, ...paymentData }).then(res => res.data);
   },
-
-  async delete(id) {
-    const response = await api.delete(`/checks/${id}`);
-    return response.data;
+  prorrogate(id, payload) {
+    return api.post(`/checks/${id}/prorrogate`, payload).then(res => res.data);
+  },
+  delete(id) {
+    return api.delete(`/checks/${id}`).then(res => res.data);
   }
 };
