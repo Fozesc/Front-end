@@ -1,140 +1,112 @@
 <script setup>
-import { ref } from 'vue';
-import { 
-  X, Save, DollarSign, Calendar, FileText, 
-  ArrowUpCircle, ArrowDownCircle 
-} from 'lucide-vue-next';
+import { reactive, onMounted, computed } from 'vue';
+import { X, Save, ArrowUpCircle, ArrowDownCircle, Wallet, Building, Banknote } from 'lucide-vue-next';
+import BaseDateInput from '../common/BaseDateInput.vue';
+
+const props = defineProps({
+  lancamento: { type: Object, default: null } 
+});
 
 const emit = defineEmits(['close', 'save']);
 
-const form = ref({
-  data: new Date().toISOString().split('T')[0],
+const form = reactive({
+  tipo: 'entrada',
   descricao: '',
-  tipo: 'saida', // entrada ou saida
   valor: '',
-  categoria: 'Despesas Gerais'
+  data: new Date().toISOString().split('T')[0],
+  origem: 'Dinheiro',
+  category: 'Geral'
+});
+
+const isEdicao = computed(() => !!props.lancamento);
+
+onMounted(() => {
+
+  if (props.lancamento) {
+
+    form.tipo = props.lancamento.tipo;
+    form.descricao = props.lancamento.descricao; 
+    form.valor = props.lancamento.valor; 
+    form.data = props.lancamento.data;
+    form.origem = props.lancamento.origem || 'Dinheiro';
+    form.category = props.lancamento.category || 'Geral';
+  }
 });
 
 const salvar = () => {
-  if (!form.value.descricao || !form.value.valor) return alert('Preencha os dados obrigatórios.');
+  if (!form.descricao || !form.valor) return alert("Preencha descrição e valor");
   
   emit('save', {
-    ...form.value,
-    id: Date.now(),
-    valor: parseFloat(form.value.valor),
-    origem: 'Manual'
+    ...form,
+    // Garante que o valor seja enviado como número
+    valor: parseFloat(form.valor)
   });
-  emit('close');
 };
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all scale-100">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="$emit('close')"></div>
+    
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
       
-      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-        <div>
-          <h3 class="font-bold text-lg text-slate-800">Novo Lançamento</h3>
-          <p class="text-xs text-slate-500">Adicione uma entrada ou despesa manual</p>
-        </div>
-        <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors">
-          <X class="w-5 h-5" />
-        </button>
+      <div class="bg-slate-900 px-6 py-4 flex justify-between items-center">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span v-if="isEdicao">Editar Lançamento</span>
+          <span v-else>Novo Lançamento</span>
+        </h2>
+        <button @click="$emit('close')" class="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"><X class="w-5 h-5" /></button>
       </div>
 
       <div class="p-6 space-y-5">
         
-        <div>
-          <label class="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wider">Tipo de Movimento</label>
-          <div class="grid grid-cols-2 gap-3">
-            <button 
-              @click="form.tipo = 'entrada'" 
-              class="flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all duration-200"
-              :class="form.tipo === 'entrada' 
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-bold' 
-                : 'border-slate-100 bg-white text-slate-500 hover:border-emerald-200 hover:bg-slate-50'"
-            >
-              <ArrowUpCircle class="w-5 h-5" :class="form.tipo === 'entrada' ? 'text-emerald-600' : 'text-slate-300'" />
-              Entrada
-            </button>
-
-            <button 
-              @click="form.tipo = 'saida'" 
-              class="flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all duration-200"
-              :class="form.tipo === 'saida' 
-                ? 'border-red-500 bg-red-50 text-red-700 font-bold' 
-                : 'border-slate-100 bg-white text-slate-500 hover:border-red-200 hover:bg-slate-50'"
-            >
-              <ArrowDownCircle class="w-5 h-5" :class="form.tipo === 'saida' ? 'text-red-600' : 'text-slate-300'" />
-              Saída
-            </button>
-          </div>
+        <div class="flex bg-slate-100 p-1 rounded-lg">
+          <button @click="form.tipo = 'entrada'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'entrada' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+            <ArrowUpCircle class="w-4 h-4" /> Entrada
+          </button>
+          <button @click="form.tipo = 'saida'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'saida' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+            <ArrowDownCircle class="w-4 h-4" /> Saída
+          </button>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
-          <div class="relative group">
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-              <FileText class="w-5 h-5" />
-            </div>
-            <input 
-              v-model="form.descricao" 
-              type="text" 
-              placeholder="Ex: Compra de Material, Café..." 
-              class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium text-slate-700" 
-            />
-          </div>
+          <input v-model="form.descricao" type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Pagamento Fornecedor" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
-            <div class="relative group">
-              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none">
-                <Calendar class="w-5 h-5" />
-              </div>
-              <input 
-                v-model="form.data" 
-                type="date" 
-                class="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium text-slate-700" 
-              />
-            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
+            <input v-model="form.valor" type="number" step="0.01" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" placeholder="0,00" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
-            <div class="relative group">
-              <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none">
-                <DollarSign class="w-5 h-5" />
-              </div>
-              <input 
-                v-model="form.valor" 
-                type="number" 
-                step="0.01" 
-                placeholder="0,00"
-                class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all font-bold text-slate-800 text-right" 
-              />
-            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
+            <BaseDateInput v-model="form.data" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Conta / Origem</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button @click="form.origem = 'Dinheiro'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Dinheiro' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
+              <Wallet class="w-5 h-5" /> Dinheiro
+            </button>
+            <button @click="form.origem = 'Banco do Brasil'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Banco do Brasil' ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
+              <Building class="w-5 h-5" /> BB
+            </button>
+            <button @click="form.origem = 'Caixa Econômica'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Caixa Econômica' ? 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
+              <Banknote class="w-5 h-5" /> Caixa
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-        <button 
-          @click="$emit('close')" 
-          class="px-5 py-2.5 text-slate-500 font-bold hover:text-slate-700 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all"
-        >
-          Cancelar
-        </button>
-        <button 
-          @click="salvar" 
-          class="px-8 py-2.5 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 flex items-center transition-all hover:-translate-y-0.5"
-          :class="form.tipo === 'entrada' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'"
-        >
-          <Save class="w-5 h-5 mr-2" />
-          Confirmar
+      <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+        <button @click="$emit('close')" class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg">Cancelar</button>
+        <button @click="salvar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center">
+          <Save class="w-4 h-4 mr-2" /> {{ isEdicao ? 'Salvar Alterações' : 'Adicionar' }}
         </button>
       </div>
-
     </div>
   </div>
 </template>

@@ -1,29 +1,29 @@
 import api from './api';
 
 export default {
-
-  async getAll(filters = {}) {
     
-    const params = new URLSearchParams(filters).toString();
-    const response = await api.get(`/transactions?${params}`);
-    return response.data;
-  },
+    getAll: async (params) => {
+        const response = await api.get('/transactions', { params });
+        return response.data;
+    },
 
+    getBalances: async () => {
+        const response = await api.get('/transactions/balances');
+        return response.data;
+    },
 
-  async create(transactionData) {
-    const response = await api.post('/transactions', transactionData);
-    return response.data;
-  },
+    create: async (data) => {
+        const response = await api.post('/transactions', data);
+        return response.data;
+    },
 
+    update: async (id, data) => {
+        const response = await api.put(`/transactions/${id}`, data);
+        return response.data;
+    },
 
-  async delete(id) {
-    const response = await api.delete(`/transactions/${id}`);
-    return response.data;
-  },
-  
- 
-  async getSummary() {
-    const response = await api.get('/transactions/summary');
-    return response.data;
-  }
+    delete: async (id) => {
+        const response = await api.delete(`/transactions/${id}`);
+        return response.data;
+    }
 };
