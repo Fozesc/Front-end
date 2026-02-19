@@ -1,6 +1,6 @@
 <script setup>
+import api from '../services/api';
 import { ref } from 'vue';
-import { ShieldCheck } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 import { 
   LayoutDashboard, 
@@ -14,17 +14,17 @@ import {
   X, 
   Wallet,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-vue-next';
 
 const route = useRoute();
 const isMobileSidebarOpen = ref(false);
 const isSidebarCollapsed = ref(false);  
 
-
 const navigation = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Cheques', path: '/cheques', icon: Banknote },
+  { name: 'Titulos', path: '/cheques', icon: Banknote },
   { name: 'Borderô', path: '/bordero', icon: Calculator },
   { name: 'Clientes', path: '/clientes', icon: Users },
   { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
@@ -38,13 +38,29 @@ const toggleMobileSidebar = () => {
 const toggleDesktopSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 };
+
+const handleLogout = async () => {
+  if(confirm("Deseja realmente sair do sistema?")) {
+    try {
+     
+      await api.post('/auth/logout'); 
+    } catch (e) {
+      console.error("Erro ao registrar logout", e);
+    } finally {
+     
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/login';
+    }
+  }
+};
 </script>
 
 <template>
   <div class="flex h-screen bg-slate-50 overflow-hidden">
     
     <aside 
-      class="hidden md:flex flex-col bg-slate-900 text-white transition-all duration-300 ease-in-out fixed h-full z-20 border-r border-slate-800"
+      class="hidden md:flex flex-col bg-slate-900 text-white transition-all duration-300 ease-in-out fixed h-full z-50 border-r border-slate-800"
       :class="isSidebarCollapsed ? 'w-20' : 'w-64'"
     >
       <div class="h-16 flex items-center px-4 border-b border-slate-800 transition-all" :class="isSidebarCollapsed ? 'justify-center' : 'justify-between'">
@@ -102,10 +118,15 @@ const toggleDesktopSidebar = () => {
             <span v-show="!isSidebarCollapsed" class="text-sm font-bold">Ajustes</span>
           </router-link>
           
-          <router-link to="/login" class="flex items-center px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors" :class="isSidebarCollapsed ? 'justify-center' : ''">
-            <LogOut class="w-5 h-5" :class="!isSidebarCollapsed ? 'mr-3' : ''" />
+          <button 
+            type="button"
+            @click="handleLogout" 
+            class="w-full flex items-center px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors cursor-pointer" 
+            :class="isSidebarCollapsed ? 'justify-center' : ''"
+          >
+            <LogOut class="w-5 h-5 flex-shrink-0" :class="!isSidebarCollapsed ? 'mr-3' : ''" />
             <span v-show="!isSidebarCollapsed" class="text-sm font-bold">Sair</span>
-          </router-link>
+          </button>
         </div>
       </div>
     </aside>
@@ -135,6 +156,14 @@ const toggleDesktopSidebar = () => {
               <component :is="item.icon" class="mr-4 h-6 w-6 text-slate-400 group-hover:text-white" />
               {{ item.name }}
             </router-link>
+            
+            <button 
+              @click="handleLogout"
+              class="w-full group flex items-center px-2 py-3 text-base font-medium rounded-md text-red-400 hover:bg-red-900/20"
+            >
+              <LogOut class="mr-4 h-6 w-6 text-red-400" />
+              Sair do Sistema
+            </button>
           </nav>
         </div>
       </div>

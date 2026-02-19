@@ -1,16 +1,17 @@
-import api from './api';
+import  api  from './api';
 
 export default {
+    getAll() {
+        return api.get('/operations').then(res => res.data);
+    },
 
-  async create(operationData) {
- 
-    const response = await api.post('/operations', operationData);
-    return response.data;
-  },
+   
+    getByClient(clientId) {
+        
+        return api.get(`/operations/client/${clientId}`).then(res => res.data);
+    },
 
-  /
-  async getAll() {
-    const response = await api.get('/operations');
-    return response.data;
-  }
+    create(data) {
+        return api.post('/operations', data).then(res => res.data);
+    }
 };

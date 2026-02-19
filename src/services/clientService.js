@@ -1,33 +1,20 @@
 import api from './api';
 
 export default {
+    getAll(params) {
+       
+        return api.get('/clients', { params }).then(res => res.data);
+    },
+    
+    getById(id) {
+        return api.get(`/clients/${id}`).then(res => res.data);
+    },
 
-  async getAll() {
-    const response = await api.get('/clients');
-    return response.data;
-  },
+    create(data) {
+        return api.post('/clients', data);
+    },
 
-  
-  async getById(id) {
-    const response = await api.get(`/clients/${id}`);
-    return response.data;
-  },
-
-
-  async create(clientData) {
-    const response = await api.post('/clients', clientData);
-    return response.data;
-  },
-
-  
-  async update(id, clientData) {
-    const response = await api.put(`/clients/${id}`, clientData);
-    return response.data;
-  },
-
-
-  async delete(id) {
-    const response = await api.delete(`/clients/${id}`);
-    return response.data;
-  }
+    update(id, data) {
+        return api.put(`/clients/${id}`, data);
+    },
 };
