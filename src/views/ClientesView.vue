@@ -27,9 +27,20 @@ const filters = reactive({
 const showModal = ref(false); 
 const saving = ref(false);
 
+// --- ATUALIZADO: Campos de endereço adicionados ao form ---
 const form = ref({
-  id: null, name: '', document: '', phone: '',
-  credit_limit: 0, standard_rate: 4.00, notes: ''
+  id: null, 
+  name: '', 
+  document: '', 
+  phone: '',
+  credit_limit: 0, 
+  standard_rate: 4.00, 
+  notes: '',
+  address: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+  zip_code: ''
 });
 
 const fetchClientes = async () => {
@@ -95,9 +106,31 @@ const salvarCliente = async () => {
 const abrirModal = (clienteId = null) => {
   if (clienteId) {
     const original = clientes.value.find(c => c.id === clienteId);
-    form.value = { ...original };
+    // Garante que se o original não tiver endereço, os campos não fiquem undefined
+    form.value = { 
+      ...original,
+      address: original.address || '',
+      neighborhood: original.neighborhood || '',
+      city: original.city || '',
+      state: original.state || '',
+      zip_code: original.zip_code || ''
+    };
   } else {
-    form.value = { id: null, name: '', document: '', phone: '', credit_limit: 0, standard_rate: 4.00, notes: '' };
+    // ATUALIZADO: Reseta os novos campos ao abrir modal vazio
+    form.value = { 
+      id: null, 
+      name: '', 
+      document: '', 
+      phone: '', 
+      credit_limit: 0, 
+      standard_rate: 4.00, 
+      notes: '',
+      address: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+      zip_code: ''
+    };
   }
   showModal.value = true;
 };
@@ -250,9 +283,9 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showModal = false"></div>
       
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden animate-scale-in">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl relative z-10 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
         
-        <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+        <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
           <div class="flex items-center gap-2">
             <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
               <User class="w-5 h-5" />
@@ -267,7 +300,7 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
           </button>
         </div>
 
-        <div class="p-6 space-y-5">
+        <div class="p-6 space-y-5 overflow-y-auto">
           
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Nome Completo</label>
@@ -311,13 +344,44 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
             </div>
           </div>
 
+          <div class="pt-2 border-t border-slate-100 mt-2">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Endereço</h4>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+              
+              <div class="md:col-span-4">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">CEP</label>
+                <input v-model="form.zip_code" type="text" placeholder="00000-000" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+              </div>
+
+              <div class="md:col-span-8">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Logradouro (Rua, Av, N°)</label>
+                <input v-model="form.address" type="text" placeholder="Ex: Av. Brasil, 123" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+              </div>
+
+              <div class="md:col-span-5">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Bairro</label>
+                <input v-model="form.neighborhood" type="text" placeholder="Centro" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+              </div>
+
+              <div class="md:col-span-5">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Cidade</label>
+                <input v-model="form.city" type="text" placeholder="Foz do Iguaçu" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">UF</label>
+                <input v-model="form.state" type="text" placeholder="PR" maxlength="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm uppercase text-center" />
+              </div>
+
+            </div>
+          </div>
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Observações</label>
             <textarea v-model="form.notes" rows="3" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 transition-all resize-none placeholder:text-slate-400" placeholder="Anotações internas sobre o cliente..."></textarea>
           </div>
         </div>
 
-        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 flex-shrink-0">
           <button @click="showModal = false" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors text-sm">Cancelar</button>
           <button @click="salvarCliente" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center transition-all active:scale-95 text-sm">
             <Loader2 v-if="saving" class="w-4 h-4 mr-2 animate-spin" />
