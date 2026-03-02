@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   ArrowLeft, Printer, CreditCard, AlertTriangle, 
-  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2
+  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin // Adicionei MapPin aqui
 } from 'lucide-vue-next';
 
 // --- SERVIÇOS ---
@@ -30,7 +30,12 @@ const cliente = ref({
   limite: 0,
   taxa: 0,
   obs: '',
-  endereco: ''
+  endereco: '',
+  // --- ADICIONEI PARA TER CERTEZA QUE NÃO VAI DAR UNDEFINED ---
+  bairro: '',
+  cidade: '',
+  estado: '',
+  cep: ''
 });
 
 const operacoesDoCliente = ref([]); 
@@ -59,7 +64,12 @@ const carregarTudo = async () => {
         limite: Number(dadosCliente.credit_limit || 0),
         taxa: Number(dadosCliente.standard_rate || 4.00),
         obs: dadosCliente.notes || '',
-        endereco: dadosCliente.address || '-'
+        // --- MAPEAMENTO DOS NOVOS CAMPOS DE ENDEREÇO ---
+        endereco: dadosCliente.address || '',
+        bairro: dadosCliente.neighborhood || '',
+        cidade: dadosCliente.city || '',
+        estado: dadosCliente.state || '',
+        cep: dadosCliente.zip_code || ''
       };
     }
 
@@ -171,6 +181,20 @@ const totalDevolvido = computed(() => {
   return total;
 });
 
+// Computed para formatar o endereço completo em uma linha (se existir)
+const enderecoCompleto = computed(() => {
+  const c = cliente.value;
+  if (!c.endereco && !c.cidade) return '-';
+  
+  let end = c.endereco || '';
+  if (c.bairro) end += `, ${c.bairro}`;
+  if (c.cidade) end += ` - ${c.cidade}`;
+  if (c.estado) end += `/${c.estado}`;
+  if (c.cep) end += ` (CEP: ${c.cep})`;
+  
+  return end || '-';
+});
+
 
 const formatMoney = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 const formatDate = (iso) => {
@@ -224,7 +248,12 @@ const exportarFicha = () => {
             <div class="flex justify-between"><span class="text-slate-500">Documento</span> <span class="font-mono text-slate-900">{{ cliente.documento }}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">Telefone</span> <span class="text-slate-900">{{ cliente.telefone }}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">Taxa</span> <span class="font-bold text-blue-600">{{ cliente.taxa }}%</span></div>
-          </div>
+            
+            <div class="pt-2 mt-2 border-t border-slate-100">
+              <div class="text-slate-500 text-xs mb-1 flex items-center gap-1"><MapPin class="w-3 h-3"/> Endereço</div>
+              <div class="text-slate-800 leading-tight text-xs">{{ enderecoCompleto }}</div>
+            </div>
+            </div>
         </div>
 
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
@@ -367,6 +396,7 @@ const exportarFicha = () => {
           <div class="text-center border-b-2 border-black pb-4 mb-6">
             <h1 class="text-2xl font-bold uppercase">Extrato de Cliente</h1>
             <p class="text-lg">{{ cliente.nome }}</p>
+            <p v-if="cliente.endereco" class="text-sm mt-1">{{ enderecoCompleto }}</p>
           </div>
           
           <div class="grid grid-cols-3 gap-4 mb-6 text-sm border-b border-black pb-4">
