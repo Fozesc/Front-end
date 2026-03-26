@@ -8,6 +8,7 @@ import {
 import { useRouter } from 'vue-router';
 import operationService from '../services/operationService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
+import api from '../services/api';
 
 const router = useRouter();
 
@@ -18,7 +19,6 @@ const selectedCompany = ref('Fozesc');
 const lastOperationId = ref(null); 
 const nextOperationId = ref('...'); 
 
-
 const limitModal = reactive({ visible: false, message: '', overAmount: 0, onConfirm: null });
 const modalState = reactive({ visible: false, title: '', message: '', type: 'success' });
 
@@ -28,7 +28,6 @@ const showPopup = (title, message, type = 'success') => {
   modalState.type = type;
   modalState.visible = true;
 };
-
 
 const itens = ref([]);
 
@@ -43,7 +42,11 @@ const header = reactive({
   diasCompensacao: 2,
   bancoPadrao: '', 
   contaSaida: 'Dinheiro',
-  observacao: ''
+  observacao: '',
+  // --- CAMPOS IOF ---
+  iofEnabled: true,
+  iofBase: 0.38,   // IOF Adicional Fixo (%)
+  iofDiario: 0.0041 // IOF Diário (%)
 });
 
 const gerador = reactive({
@@ -55,16 +58,31 @@ const gerador = reactive({
   diasIntervalo: 30
 });
 
+const fetchSettings = async () => {
+  try {
+    const { data } = await api.get('/settings/');
+    if (data) {
+      // Procura pelo nome exato que está no seu banco de dados
+      const taxaBase = data.iof_base || data.iof_rate || data.iof_base_rate || 0.38;
+      header.iofBase = Number(taxaBase);
+      
+      // Se houver IOF diário no banco, ele pega. Se não, usa o padrão 0.0041
+      const taxaDiaria = data.iof_daily || data.iof_daily_rate || 0.0041;
+      header.iofDiario = Number(taxaDiaria);
+    }
+  } catch (error) {
+    console.error("Usando IOF padrão (Fixo: 0.38% / Diário: 0.0041%)");
+  }
+};
 
-onMounted(() => {
+onMounted(async () => {
   const hoje = new Date();
   hoje.setDate(hoje.getDate() + 30);
   gerador.primeiroVencimento = hoje.toISOString().split('T')[0];
   
+  await fetchSettings(); 
   adicionarLinha(); 
-  
 });
-
 
 const fetchNextId = async () => {
   try {
@@ -81,7 +99,6 @@ const fetchNextId = async () => {
   }
 };
 
-
 const selecionarCliente = (cliente) => {
   if (!cliente) {
     header.clienteId = null; header.clienteNome = '';
@@ -97,14 +114,14 @@ const selecionarCliente = (cliente) => {
   recalcularTudo();
 };
 
-
 const totais = computed(() => {
   return itens.value.reduce((acc, item) => {
     acc.bruto += Number(item.valor || 0); 
     acc.juros += Number(item.juros || 0); 
+    acc.iof += Number(item.iof || 0); 
     acc.liquido += Number(item.liquido || 0); 
     return acc;
-  }, { bruto: 0, juros: 0, liquido: 0 });
+  }, { bruto: 0, juros: 0, iof: 0, liquido: 0 });
 });
 
 const arredondar = (valor) => Math.round((valor + Number.EPSILON) * 100) / 100;
@@ -124,31 +141,34 @@ const calcularDias = (dataBase, dataVencimento, diasComp) => {
   return diffDays + Number(diasComp);
 };
 
-
 const recalcularLinha = (item) => {
   item.dias = calcularDias(header.dataOperacao, item.vencimento, header.diasCompensacao);
   if (!item.valor || item.dias <= 0) { 
-    item.juros = 0; item.liquido = Number(item.valor) || 0; return; 
+    item.juros = 0; item.iof = 0; item.liquido = Number(item.valor) || 0; return; 
   }
   
   const valorFace = Number(item.valor);
   const taxaDecimal = Number(header.taxaMensal) / 100;
   const totalMes = item.dias / 30.0;
   
-
   const fator = Math.pow(1 + taxaDecimal, totalMes);
-  
-
   const jurosCalculado = valorFace * (fator - 1);
   
+  // --- NOVA REGRA DO IOF OFICIAL ---
+  let iofCalculado = 0;
+  if (header.iofEnabled) {
+    const calcBase = valorFace * (header.iofBase / 100);
+    const calcDiario = valorFace * (header.iofDiario / 100) * item.dias;
+    iofCalculado = calcBase + calcDiario;
+  }
+  
   item.juros = arredondar(jurosCalculado);
-  item.liquido = arredondar(valorFace - item.juros);
+  item.iof = arredondar(iofCalculado);
+  item.liquido = arredondar(valorFace - item.juros - item.iof);
 };
 
 const recalcularTudo = () => { itens.value.forEach(recalcularLinha); };
-watch(() => [header.dataOperacao, header.taxaMensal, header.diasCompensacao], () => recalcularTudo());
-
-
+watch(() => [header.dataOperacao, header.taxaMensal, header.diasCompensacao, header.iofEnabled, header.iofBase], () => recalcularTudo());
 
 const gerarParcelas = () => {
   if (gerador.valorAlvo <= 0 || gerador.qtdParcelas <= 0) return;
@@ -179,11 +199,17 @@ const gerarParcelas = () => {
   if (gerador.modo === 'valor_mao') {
     let somaDivisores = 0;
     const taxaDecimal = Number(header.taxaMensal) / 100;
+    const iofBaseDecimal = header.iofEnabled ? (header.iofBase / 100) : 0;
+    const iofDiarioDecimal = header.iofEnabled ? (header.iofDiario / 100) : 0;
+
     datas.forEach(dataVenc => {
       const dias = calcularDias(header.dataOperacao, dataVenc, header.diasCompensacao);
       const tempoMeses = dias / 30.0;
       const fator = Math.pow(1 + taxaDecimal, tempoMeses);
-      const divisor = 2 - fator;
+      
+      // Matemática Inversa Completa
+      const iofCompleto = iofBaseDecimal + (iofDiarioDecimal * dias);
+      const divisor = 2 - fator - iofCompleto; 
       somaDivisores += divisor;
     });
     valorParcelaBruta = gerador.valorAlvo / somaDivisores;
@@ -198,17 +224,16 @@ const gerarParcelas = () => {
       id: Date.now() + i,
       vencimento: datas[i],
       valor: valorParcelaBruta,
-      dias: 0, juros: 0, liquido: 0, banco: '', num_doc: `${i + 1}/${gerador.qtdParcelas}`
+      dias: 0, juros: 0, iof: 0, liquido: 0, banco: '', num_doc: `${i + 1}/${gerador.qtdParcelas}`
     };
     itens.value.push(novoItem);
   }
   recalcularTudo();
 };
 
-const adicionarLinha = () => { itens.value.push({ id: Date.now(), vencimento: '', valor: 0, dias: 0, juros: 0, liquido: 0, banco: header.bancoPadrao, num_doc: '' }); };
+const adicionarLinha = () => { itens.value.push({ id: Date.now(), vencimento: '', valor: 0, dias: 0, juros: 0, iof: 0, liquido: 0, banco: header.bancoPadrao, num_doc: '' }); };
 const removerLinha = (index) => { itens.value.splice(index, 1); recalcularTudo(); };
 const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-
 
 const exportarBordero = async () => { 
   isPrinting.value = true; 
@@ -216,7 +241,6 @@ const exportarBordero = async () => {
   window.print(); 
   isPrinting.value = false; 
 };
-
 
 const verificarLimiteESalvar = () => {
   if (!header.clienteId) return showPopup('Atenção', 'Selecione um cliente válido.', 'error');
@@ -248,6 +272,7 @@ const processarSalvamento = async () => {
       taxa_mensal: header.taxaMensal,
       dias_compensacao: header.diasCompensacao,
       account_source: header.contaSaida,
+      iof_amount: totais.value.iof, 
       checks: itens.value.map(item => ({
         valor: item.valor, vencimento: item.vencimento,
         banco: item.banco || '', num_doc: item.num_doc || '', emitente: header.emitenteNome
@@ -261,7 +286,6 @@ const processarSalvamento = async () => {
     
     showPopup('Sucesso!', `Operação #${resposta.id} realizada!\nLíquido: ${formatCurrency(resposta.total_net)}`);
     
-   
     itens.value = [];
     adicionarLinha();
     gerador.valorAlvo = 0;
@@ -353,7 +377,7 @@ const processarSalvamento = async () => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-7 gap-4">
           <div class="col-span-2 md:col-span-1">
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Data</label>
             <input type="date" v-model="header.dataOperacao" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium" />
@@ -370,7 +394,15 @@ const processarSalvamento = async () => {
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Banco Padrão</label>
             <input type="text" v-model="header.bancoPadrao" placeholder="Ex: BB" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
-           <div class="col-span-2 md:col-span-2">
+
+          <div class="col-span-1 md:col-span-1 flex flex-col justify-center">
+             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Cobrar IOF?</label>
+             <button @click="header.iofEnabled = !header.iofEnabled" :class="['px-2 py-2.5 rounded-lg text-xs font-bold transition-colors w-full border truncate', header.iofEnabled ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200']">
+               {{ header.iofEnabled ? `Sim (${header.iofBase}%)` : 'Não' }}
+             </button>
+          </div>
+
+           <div class="col-span-1 md:col-span-2">
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Conta de Saída</label>
             <div class="flex bg-slate-50 p-1 rounded-lg border border-slate-200">
               <button @click="header.contaSaida = 'Dinheiro'" :class="`flex-1 py-1.5 text-xs font-bold rounded ${header.contaSaida === 'Dinheiro' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`"><Wallet class="w-3 h-3 inline mr-1" /> Dinheiro</button>
@@ -427,6 +459,9 @@ const processarSalvamento = async () => {
                 <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center w-20">Dias</th>
                 <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-right">Valor Cheque</th>
                 <th class="px-4 py-3 text-xs font-bold text-red-500 bg-red-50 uppercase text-right">Juros</th>
+                
+                <th v-if="header.iofEnabled" class="px-4 py-3 text-xs font-bold text-orange-500 bg-orange-50 uppercase text-right">IOF</th>
+                
                 <th class="px-4 py-3 text-xs font-bold text-emerald-600 bg-emerald-50 uppercase text-right">Líquido</th>
                 <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Banco / Doc</th>
                 <th class="px-4 py-3 w-10"></th>
@@ -439,7 +474,10 @@ const processarSalvamento = async () => {
                 <td class="px-4 py-3 text-center"><span class="inline-block bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded min-w-[3rem]">{{ item.dias }}</span></td>
                 <td class="px-4 py-3"><input type="number" step="0.01" v-model="item.valor" @input="recalcularLinha(item)" class="w-full text-right bg-white border border-slate-200 rounded px-2 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" /></td>
                 <td class="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30 text-sm">-{{ formatCurrency(item.juros) }}</td>
-                <td class="px-4 py-3 text-right font-bold text-emerald-600 bg-emerald-50/30 text-sm">-{{ formatCurrency(item.liquido) }}</td>
+                
+                <td v-if="header.iofEnabled" class="px-4 py-3 text-right font-bold text-orange-600 bg-orange-50/30 text-sm">-{{ formatCurrency(item.iof) }}</td>
+
+                <td class="px-4 py-3 text-right font-bold text-emerald-600 bg-emerald-50/30 text-sm">{{ formatCurrency(item.liquido) }}</td>
                 <td class="px-4 py-3"><div class="flex gap-2"><input type="text" v-model="item.banco" placeholder="Banco" class="w-20 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs" /><input type="text" v-model="item.num_doc" placeholder="Doc" class="w-20 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs" /></div></td>
                 <td class="px-4 py-3 text-center"><button @click="removerLinha(index)" class="text-slate-300 hover:text-red-500"><Trash2 class="w-4 h-4" /></button></td>
               </tr>
@@ -453,8 +491,10 @@ const processarSalvamento = async () => {
     <div class="print:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 z-40 border-t border-slate-700 md:pl-64 shadow-lg">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex gap-8 text-sm">
-          <div><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">Bruto</span><span class="font-bold text-xl">-{{ formatCurrency(totais.bruto) }}</span></div>
+          <div><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">Bruto</span><span class="font-bold text-xl">{{ formatCurrency(totais.bruto) }}</span></div>
           <div><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">Juros</span><span class="font-bold text-xl text-red-400">-{{ formatCurrency(totais.juros) }}</span></div>
+          
+          <div v-if="header.iofEnabled"><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">IOF</span><span class="font-bold text-xl text-orange-400">-{{ formatCurrency(totais.iof) }}</span></div>
         </div>
         <div class="flex items-center gap-4 bg-slate-800 px-6 py-2 rounded-xl border border-slate-700"><span class="text-xs font-bold text-indigo-300 uppercase tracking-widest text-right">Líquido<br>a Pagar</span><span class="text-3xl font-extrabold text-white">{{ formatCurrency(totais.liquido) }}</span></div>
       </div>
@@ -468,26 +508,37 @@ const processarSalvamento = async () => {
         </div>
         <div class="text-right">
           <h2 class="text-xl font-bold uppercase">Demonstrativo de Borderô</h2>
-          
           <p v-if="lastOperationId" class="text-base font-bold text-gray-700">Nº {{ lastOperationId }}</p>
-          
           <p class="text-sm mt-1">Data: {{ new Date().toLocaleDateString('pt-BR') }}</p>
         </div>
       </div>
       
       <div class="grid grid-cols-2 gap-8 mb-6 text-sm border border-gray-300 p-4 rounded-lg">
         <div><p><strong class="uppercase text-gray-500 text-xs">Cliente:</strong></p><p class="text-lg font-bold">{{ header.clienteNome || '---' }}</p></div>
-        <div><p><strong class="uppercase text-gray-500 text-xs">Taxa:</strong></p><p class="font-mono">{{ header.taxaMensal }}% a.m.</p></div>
+        <div>
+          <p><strong class="uppercase text-gray-500 text-xs">Taxa:</strong> <span class="font-mono ml-2">{{ header.taxaMensal }}% a.m.</span></p>
+          <p v-if="header.iofEnabled"><strong class="uppercase text-gray-500 text-xs">IOF:</strong> <span class="font-mono ml-2">{{ header.iofBase }}% Fixo + {{ header.iofDiario }}% a.d.</span></p>
+        </div>
       </div>
       
       <table class="w-full text-left text-xs mb-8 border-collapse">
-        <thead><tr class="border-b-2 border-black"><th class="py-2">Vencimento</th><th class="py-2 text-center">Dias</th><th class="py-2 text-right">Valor Face</th><th class="py-2 text-right">Juros</th><th class="py-2 text-right">Líquido</th></tr></thead>
+        <thead>
+          <tr class="border-b-2 border-black">
+            <th class="py-2">Vencimento</th>
+            <th class="py-2 text-center">Dias</th>
+            <th class="py-2 text-right">Valor Face</th>
+            <th class="py-2 text-right">Juros</th>
+            <th class="py-2 text-right" v-if="header.iofEnabled">IOF</th>
+            <th class="py-2 text-right">Líquido</th>
+          </tr>
+        </thead>
         <tbody>
           <tr v-for="item in itens" :key="item.id" class="border-b border-gray-200">
             <td class="py-2 font-mono">{{ item.vencimento.split('-').reverse().join('/') }}</td>
             <td class="py-2 text-center">{{ item.dias }}</td>
             <td class="py-2 text-right font-bold">{{ formatCurrency(item.valor) }}</td>
             <td class="py-2 text-right">{{ formatCurrency(item.juros) }}</td>
+            <td class="py-2 text-right" v-if="header.iofEnabled">{{ formatCurrency(item.iof) }}</td>
             <td class="py-2 text-right font-bold">{{ formatCurrency(item.liquido) }}</td>
           </tr>
         </tbody>
