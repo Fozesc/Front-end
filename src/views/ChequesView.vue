@@ -4,14 +4,14 @@ import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ChequeForm from '../components/layout/finance/ChequeForm.vue'; 
 import ChequeDetalhesModal from '../components/layout/finance/ChequeDetalhesModal.vue';
-
 import ProrrogacaoModal from '../components/layout/finance/ProrrogacaoModal.vue'; 
+import api from '../services/api';
 
 import { 
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock
+  Edit, Download, CalendarClock, AlertTriangle 
 } from 'lucide-vue-next';
 
 import checkService from '../services/checkService';
@@ -23,10 +23,8 @@ const selectedCheque = ref(null);
 const loading = ref(false);
 const isPrinting = ref(false); 
 
-
 const showProrrogacaoModal = ref(false);
 const chequeParaProrrogar = ref(null);
-
 const chequeParaEditar = ref(null);
 
 const openStatusMenuId = ref(null);
@@ -39,6 +37,19 @@ const totalItems = ref(0);
 const totalPages = ref(1);
 const currentPage = ref(1);
 const itemsPerPage = 40; 
+const taxaMulta = ref(2.0); // Valor inicial padrão
+
+const fetchSettings = async () => {
+  try {
+    const { data } = await api.get('/settings/');
+    if (data) {
+      // Pega o valor exato salvo na tela de Configurações (o || 2.0 é só caso venha nulo/vazio do banco)
+      taxaMulta.value = Number(data.fine_rate || data.taxa_multa || data.multa_devolucao || 2.0);
+    }
+  } catch (error) {
+    console.error("Erro ao buscar configurações, usando 2.0%", error);
+  }
+};
 
 const filters = reactive({
   search: '',
@@ -50,6 +61,24 @@ const filters = reactive({
 });
 
 const statusOptions = ['Aguardando', 'Pago', 'Atrasado', 'Devolvido', 'Juridico'];
+
+// --- ESTADO DO MODAL DE CONFIRMAÇÃO ---
+const confirmModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  action: null,
+  type: 'danger' 
+});
+
+const openConfirm = (title, message, actionCallback, type = 'danger') => {
+  confirmModal.title = title;
+  confirmModal.message = message;
+  confirmModal.action = actionCallback;
+  confirmModal.type = type;
+  confirmModal.visible = true;
+};
+// --------------------------------------
 
 const carregarDados = async () => {
   loading.value = true;
@@ -130,6 +159,7 @@ const closeGlobalMenus = () => {
 };
 
 onMounted(() => {
+  fetchSettings(); // Busca a taxa do banco ao abrir a tela
   carregarDados();
   document.addEventListener('click', closeGlobalMenus);
   document.addEventListener('scroll', closeGlobalMenus, true);
@@ -139,7 +169,6 @@ const abrirNovo = () => {
   chequeParaEditar.value = null;
   showModal.value = true;
 };
-
 
 const abrirProrrogacao = (cheque) => {
   chequeParaProrrogar.value = cheque;
@@ -151,21 +180,58 @@ const abrirEdicao = (cheque) => {
   showModal.value = true;
 };
 
-const alterarStatus = async (cheque, novoStatus) => {
-  if (novoStatus === 'Pago' && !confirm(`Confirmar recebimento do cheque R$ ${cheque.valor_liquido}?`)) return;
-  try {
-    await checkService.updateStatus(cheque.id, novoStatus);
-    cheque.status = novoStatus; 
-    closeGlobalMenus();
-  } catch (error) { alert("Erro ao atualizar."); }
-};
+const alterarStatus = (cheque, novoStatus) => {
+  closeGlobalMenus();
+  if (cheque.status === novoStatus) return;
 
-const deletarCheque = async (id) => {
-  if(!confirm("Excluir cheque permanentemente?")) return;
-  try {
-    await checkService.delete(id);
-    carregarDados();
-  } catch (error) { alert("Erro ao excluir."); }
+  let title = `Alterar Status`;
+  let msg = `Tem certeza que deseja mudar o status para "${novoStatus}"?`;
+  let alertType = 'warning';
+
+  if (novoStatus === 'Pago') {
+    title = 'Confirmar Recebimento';
+    msg = `Você está prestes a dar baixa no cheque de ${formatCurrency(cheque.valor_liquido)}. Confirma o recebimento?`;
+    alertType = 'success';
+  } else if (novoStatus === 'Devolvido') {
+    title = 'Confirmar Devolução';
+    // Multiplica a taxa que veio do banco pelo valor bruto do cheque
+    const valorMultaCalculada = cheque.valor_bruto * (taxaMulta.value / 100);
+    msg = `Ao marcar como Devolvido, será cobrada uma multa de ${taxaMulta.value}% (${formatCurrency(valorMultaCalculada)}) do cliente. Deseja continuar?`;
+    alertType = 'danger';
+  }
+
+  openConfirm(title, msg, async () => {
+    try {
+      // Usamos a 'api' diretamente aqui para furar o bloqueio do checkService.js
+      // e garantir que a taxa de multa chegue 100% no servidor.
+      await api.patch(`/checks/${cheque.id}/status`, {
+          status: novoStatus,
+          taxa_multa: taxaMulta.value, 
+          payment_data: { taxa_multa: taxaMulta.value }
+      });
+      
+      cheque.status = novoStatus; 
+      carregarDados();
+    } catch (error) { 
+      alert("Erro ao atualizar o status do cheque."); 
+    }
+  }, alertType);
+};
+// ------------------------------------------------
+const deletarCheque = (id) => {
+  openConfirm(
+    'Excluir Cheque', 
+    'Tem certeza que deseja excluir este cheque permanentemente? Esta ação não pode ser desfeita.', 
+    async () => {
+      try {
+        await checkService.delete(id);
+        carregarDados();
+      } catch (error) { 
+        alert("Erro ao excluir."); 
+      }
+    }, 
+    'danger'
+  );
 };
 
 const abrirDetalhes = (cheque) => { selectedCheque.value = cheque; showDetailsModal.value = true; };
@@ -226,6 +292,31 @@ const exportarTela = () => {
       @save="() => { showProrrogacaoModal = false; carregarDados(); }" 
     />
 
+    <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 p-6 text-center animate-scale-in">
+        
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6"
+             :class="confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : (confirmModal.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600')">
+          <AlertTriangle v-if="confirmModal.type !== 'success'" class="h-8 w-8" />
+          <CheckSquare v-else class="h-8 w-8" />
+        </div>
+        
+        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ confirmModal.title }}</h3>
+        <p class="text-slate-500 mb-8">{{ confirmModal.message }}</p>
+        
+        <div class="flex gap-3 justify-center">
+          <button @click="confirmModal.visible = false" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors w-full">
+            Cancelar
+          </button>
+          <button @click="() => { confirmModal.action(); confirmModal.visible = false; }" 
+                  class="px-5 py-2.5 text-white font-bold rounded-lg shadow-md transition-colors w-full"
+                  :class="confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : (confirmModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600')">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -413,4 +504,6 @@ const exportarTela = () => {
   .print-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 20mm; }
   .print:hidden { display: none !important; }
 }
+.animate-scale-in { animation: scaleIn 0.2s ease-out; }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>

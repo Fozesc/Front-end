@@ -92,6 +92,12 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
            </div>
         </div>
 
+        <div v-if="cheque.observacao" class="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+          <label class="text-[10px] font-bold text-amber-700 uppercase flex items-center gap-1 mb-2">
+            <FileText class="w-3 h-3" /> Observações da Operação
+          </label>
+          <p class="text-sm text-amber-900 whitespace-pre-wrap font-medium leading-relaxed">{{ cheque.observacao }}</p>
+        </div>
         <div v-if="cheque.historico_prorrogacao && cheque.historico_prorrogacao.length > 0" class="mt-6 border-t-2 border-dashed border-slate-200 pt-4">
           <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
             <History class="w-4 h-4 text-indigo-500" /> Histórico de Prorrogações
