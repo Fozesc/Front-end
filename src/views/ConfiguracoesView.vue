@@ -1,18 +1,17 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Save, Settings, Building, Percent, Users, 
-  Plus, Edit2, Trash2, Shield, X, Check, Lock 
+  Plus, Edit2, Trash2, Shield, X, Check, Lock,
+  AlertTriangle, CheckSquare, CheckCircle // <-- Ícones novos para os modais
 } from 'lucide-vue-next';
 import api from '../services/api';
-
 
 const loading = ref(false);
 const saving = ref(false);
 const users = ref([]);
 const showUserModal = ref(false);
-
 
 const config = ref({
   nomeEmpresa: '',
@@ -26,7 +25,6 @@ const config = ref({
   fine_rate: 2.00
 });
 
-
 const userForm = ref({
   id: null,
   name: '',
@@ -37,6 +35,38 @@ const userForm = ref({
 
 const roles = ['Admin', 'Gerente', 'Operador'];
 
+// --- ESTADO DO MODAL DE ALERTA (Sucesso/Erro) ---
+const alertModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  type: 'success'
+});
+
+const showAlert = (title, message, type = 'success') => {
+  alertModal.title = title;
+  alertModal.message = message;
+  alertModal.type = type;
+  alertModal.visible = true;
+};
+
+// --- ESTADO DO MODAL DE CONFIRMAÇÃO (Exclusão) ---
+const confirmModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+  action: null,
+  type: 'danger'
+});
+
+const openConfirm = (title, message, actionCallback, type = 'danger') => {
+  confirmModal.title = title;
+  confirmModal.message = message;
+  confirmModal.action = actionCallback;
+  confirmModal.type = type;
+  confirmModal.visible = true;
+};
+// ------------------------------------------------
 
 const fetchSettings = async () => {
   try {
@@ -49,7 +79,6 @@ const fetchSettings = async () => {
 
 const fetchUsers = async () => {
   try {
-   
     const { data } = await api.get('/users/'); 
     users.value = data;
   } catch (error) {
@@ -57,14 +86,13 @@ const fetchUsers = async () => {
   }
 };
 
-
 const salvarConfig = async () => {
   saving.value = true;
   try {
     await api.put('/settings/', config.value);
-    alert('Preferências salvas com sucesso!');
+    showAlert('Sucesso!', 'Preferências salvas com sucesso!', 'success');
   } catch (error) {
-    alert("Erro ao salvar configurações.");
+    showAlert('Erro', 'Erro ao salvar configurações.', 'error');
   } finally {
     saving.value = false;
   }
@@ -80,8 +108,8 @@ const openUserModal = (user = null) => {
 };
 
 const saveUser = async () => {
-  if (!userForm.value.name || !userForm.value.email) return alert("Preencha nome e email.");
-  if (!userForm.value.id && !userForm.value.password) return alert("Senha é obrigatória.");
+  if (!userForm.value.name || !userForm.value.email) return showAlert('Atenção', 'Preencha nome e email.', 'error');
+  if (!userForm.value.id && !userForm.value.password) return showAlert('Atenção', 'A senha é obrigatória.', 'error');
 
   loading.value = true;
   try {
@@ -92,21 +120,29 @@ const saveUser = async () => {
     }
     showUserModal.value = false;
     fetchUsers(); 
+    showAlert('Sucesso', 'Usuário salvo com sucesso!', 'success');
   } catch (error) {
-    alert(error.response?.data?.error || "Erro ao salvar usuário.");
+    showAlert('Erro', error.response?.data?.error || "Erro ao salvar usuário.", 'error');
   } finally {
     loading.value = false;
   }
 };
 
-const deleteUser = async (id) => {
-  if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
-  try {
-    await api.delete(`/users/${id}`);
-    fetchUsers();
-  } catch (error) {
-    alert("Erro ao excluir.");
-  }
+const deleteUser = (id) => {
+  openConfirm(
+    'Excluir Usuário', 
+    'Tem certeza que deseja excluir este usuário? Ele perderá o acesso ao sistema e esta ação não pode ser desfeita.', 
+    async () => {
+      try {
+        await api.delete(`/users/${id}`);
+        fetchUsers();
+        showAlert('Sucesso', 'Usuário excluído com sucesso!', 'success');
+      } catch (error) {
+        showAlert('Erro', 'Erro ao excluir usuário.', 'error');
+      }
+    }, 
+    'danger'
+  );
 };
 
 onMounted(() => {
@@ -117,6 +153,44 @@ onMounted(() => {
 
 <template>
   <DashboardLayout>
+    
+    <div v-if="alertModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity p-4">
+      <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 animate-scale-in relative z-10">
+        <div :class="`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6 ${alertModal.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`">
+          <CheckCircle v-if="alertModal.type === 'success'" class="h-10 w-10 text-emerald-600" />
+          <AlertTriangle v-else class="h-10 w-10 text-red-600" />
+        </div>
+        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ alertModal.title }}</h3>
+        <p class="text-slate-500 mb-8">{{ alertModal.message }}</p>
+        <button @click="alertModal.visible = false" :class="`w-full py-3 px-4 rounded-xl text-white font-bold text-lg shadow-lg ${alertModal.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`">Entendido</button>
+      </div>
+    </div>
+
+    <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 p-6 text-center animate-scale-in">
+        
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6"
+             :class="confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : (confirmModal.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600')">
+          <AlertTriangle v-if="confirmModal.type !== 'success'" class="h-8 w-8" />
+          <CheckSquare v-else class="h-8 w-8" />
+        </div>
+        
+        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ confirmModal.title }}</h3>
+        <p class="text-slate-500 mb-8">{{ confirmModal.message }}</p>
+        
+        <div class="flex gap-3 justify-center">
+          <button @click="confirmModal.visible = false" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors w-full">
+            Cancelar
+          </button>
+          <button @click="() => { confirmModal.action(); confirmModal.visible = false; }" 
+                  class="px-5 py-2.5 text-white font-bold rounded-lg shadow-md transition-colors w-full"
+                  :class="confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : (confirmModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600')">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
     
     <div v-if="showUserModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showUserModal = false"></div>
