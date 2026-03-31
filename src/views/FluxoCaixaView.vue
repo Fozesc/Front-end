@@ -30,7 +30,7 @@ const currentPage = ref(1);
 const itemsPerPage = 40;
 
 const resumoFiltro = ref({ entradas: 0, saidas: 0, resultado: 0 });
-const saldos = ref({ bb: 0, caixa: 0, dinheiro: 0, total: 0 });
+const saldos = ref({ bb: 0, caixa: 0, dinheiro: 0, pix: 0, total: 0 }); // <-- PIX ADICIONADO AQUI
 const chequesCarteiraTotal = ref(0);
 const capitalInvestido = ref(0);
 
@@ -203,10 +203,11 @@ const exportar = () => {
 
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div class="flex items-center gap-3 mb-4 text-blue-600"><Building class="w-5 h-5" /> <span class="text-xs font-bold uppercase tracking-wider">Por Conta</span></div>
-          <div class="space-y-3">
+          <div class="space-y-2">
             <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">BB</span><span class="text-sm font-bold font-mono" :class="saldos.bb < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.bb) }}</span></div>
             <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Caixa</span><span class="text-sm font-bold font-mono" :class="saldos.caixa < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.caixa) }}</span></div>
-            <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-2"><span class="text-xs text-slate-500 font-bold uppercase">Dinheiro</span><span class="text-sm font-bold font-mono" :class="saldos.dinheiro < 0 ? 'text-red-600' : 'text-emerald-700'">{{ formatMoney(saldos.dinheiro) }}</span></div>
+            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">PIX</span><span class="text-sm font-bold font-mono" :class="saldos.pix < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.pix) }}</span></div>
+            <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-1"><span class="text-xs text-slate-500 font-bold uppercase">Dinheiro Físico</span><span class="text-sm font-bold font-mono" :class="saldos.dinheiro < 0 ? 'text-red-600' : 'text-emerald-700'">{{ formatMoney(saldos.dinheiro) }}</span></div>
           </div>
         </div>
 
@@ -331,6 +332,7 @@ const exportar = () => {
               <div class="text-xs space-y-1 text-gray-500 border-t pt-1 mt-1">
                  <div class="flex justify-between"><span>BB</span> <span>{{ formatMoney(saldos.bb) }}</span></div>
                  <div class="flex justify-between"><span>Caixa</span> <span>{{ formatMoney(saldos.caixa) }}</span></div>
+                 <div class="flex justify-between"><span>PIX</span> <span class="font-bold">{{ formatMoney(saldos.pix) }}</span></div>
                  <div class="flex justify-between"><span>Dinheiro</span> <span>{{ formatMoney(saldos.dinheiro) }}</span></div>
               </div>
            </div>

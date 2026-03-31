@@ -83,12 +83,21 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
                 {{ cheque.status }}
              </div>
            </div>
-           <div v-if="cheque.data_pagamento" class="text-right">
-             <label class="text-[10px] font-bold text-emerald-600 uppercase flex items-center justify-end gap-1 mb-1"><CheckCircle class="w-3 h-3" /> Pago em</label>
-             <div class="font-bold text-emerald-700">{{ formatDate(cheque.data_pagamento) }}</div>
-             <div v-if="cheque.valor_pago > 0" class="text-xs text-emerald-600 font-bold">
-               Recebido: {{ formatMoney(cheque.valor_pago) }}
-             </div>
+           
+           <div class="text-right">
+               <div v-if="cheque.data_pagamento">
+                 <label class="text-[10px] font-bold text-emerald-600 uppercase flex items-center justify-end gap-1 mb-1"><CheckCircle class="w-3 h-3" /> Pago em</label>
+                 <div class="font-bold text-emerald-700">{{ formatDate(cheque.data_pagamento) }}</div>
+                 <div v-if="cheque.forma_pagamento" class="text-[10px] font-bold text-emerald-800 uppercase mt-1 bg-emerald-100 border border-emerald-200 inline-block px-2 py-0.5 rounded shadow-sm">
+                   Via {{ cheque.forma_pagamento }}
+                 </div>
+               </div>
+
+               <div v-if="cheque.status === 'Devolvido' && cheque.forma_devolucao" class="mt-1">
+                 <div class="text-[10px] font-bold text-red-600 uppercase bg-red-100 border border-red-200 inline-block px-2 py-0.5 rounded shadow-sm">
+                   Multa cobrada via {{ cheque.forma_devolucao }}
+                 </div>
+               </div>
            </div>
         </div>
 
@@ -98,6 +107,7 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
           </label>
           <p class="text-sm text-amber-900 whitespace-pre-wrap font-medium leading-relaxed">{{ cheque.observacao }}</p>
         </div>
+
         <div v-if="cheque.historico_prorrogacao && cheque.historico_prorrogacao.length > 0" class="mt-6 border-t-2 border-dashed border-slate-200 pt-4">
           <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
             <History class="w-4 h-4 text-indigo-500" /> Histórico de Prorrogações
@@ -112,6 +122,7 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
                   <th class="px-3 py-2">Para</th>
                   <th class="px-3 py-2 text-right">Dias</th>
                   <th class="px-3 py-2 text-right">Taxa</th>
+                  <th class="px-3 py-2 text-right">Conta</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
@@ -122,6 +133,11 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
                   <td class="px-3 py-2 font-bold text-indigo-700">{{ formatDate(hist.para) }}</td>
                   <td class="px-3 py-2 text-right font-bold text-slate-600">+{{ hist.dias }}</td>
                   <td class="px-3 py-2 text-right font-bold text-red-600">{{ formatMoney(hist.taxa) }}</td>
+                  <td class="px-3 py-2 text-right">
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-100 text-slate-600 border-slate-200 shadow-sm">
+                      {{ hist.forma_pagamento }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
