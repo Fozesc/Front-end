@@ -273,6 +273,7 @@ const processarSalvamento = async () => {
       dias_compensacao: header.diasCompensacao,
       account_source: header.contaSaida,
       iof_amount: totais.value.iof, 
+      notes: header.observacao,
       checks: itens.value.map(item => ({
         valor: item.valor, vencimento: item.vencimento,
         banco: item.banco || '', num_doc: item.num_doc || '', emitente: header.emitenteNome
@@ -376,6 +377,16 @@ const processarSalvamento = async () => {
             <input type="text" v-model="header.emitenteNome" placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
           </div>
         </div>
+
+        <div class="relative group">
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Emitente do Cheque</label>
+        <input type="text" v-model="header.emitenteNome" placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
+      </div>
+
+      <div class="md:col-span-2 relative group mt-2">
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Observações do Borderô</label>
+        <textarea v-model="header.observacao" rows="2" placeholder="Notas sobre esta negociação..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 resize-none"></textarea>
+      </div>
 
         <div class="grid grid-cols-2 md:grid-cols-7 gap-4">
           <div class="col-span-2 md:col-span-1">

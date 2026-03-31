@@ -30,7 +30,8 @@ const currentPage = ref(1);
 const itemsPerPage = 40;
 
 const resumoFiltro = ref({ entradas: 0, saidas: 0, resultado: 0 });
-const saldos = ref({ bb: 0, caixa: 0, dinheiro: 0, pix: 0, total: 0 }); // <-- PIX ADICIONADO AQUI
+// REMOVIDO PIX DOS SALDOS - AGORA É INCORPORADO NO DINHEIRO
+const saldos = ref({ bb: 0, caixa: 0, dinheiro: 0, total: 0 }); 
 const chequesCarteiraTotal = ref(0);
 const capitalInvestido = ref(0);
 
@@ -52,7 +53,8 @@ const carregarTabela = async () => {
     };
 
     const res = await transactionService.getAll(params);
-    lancamentos.value = res.items;
+    // Filtra para não mostrar lançamentos de "Saldo Inicial" na tabela (opcional, caso queira esconder)
+    lancamentos.value = res.items.filter(i => i.categoria !== 'Saldo Inicial');
     totalItems.value = res.total;
     totalPages.value = res.pages;
     if (res.summary) resumoFiltro.value = res.summary;
@@ -71,7 +73,16 @@ const carregarSaldos = async () => {
       checkService.getPortfolioTotal(),
       settingsService.get()
     ]);
-    saldos.value = resSaldos;
+    
+    // LÓGICA DE UNIFICAÇÃO: Soma PIX ao Dinheiro caso o backend ainda envie separado
+    const saldoUnificado = {
+        bb: resSaldos.bb || 0,
+        caixa: resSaldos.caixa || 0,
+        dinheiro: (resSaldos.dinheiro || 0) + (resSaldos.pix || 0),
+        total: resSaldos.total || 0
+    };
+
+    saldos.value = saldoUnificado;
     chequesCarteiraTotal.value = resCheques.total_portfolio || 0;
     capitalInvestido.value = resSettings.capital_social || 0;
   } catch (e) { console.error("Erro saldos:", e); }
@@ -204,10 +215,9 @@ const exportar = () => {
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div class="flex items-center gap-3 mb-4 text-blue-600"><Building class="w-5 h-5" /> <span class="text-xs font-bold uppercase tracking-wider">Por Conta</span></div>
           <div class="space-y-2">
-            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">BB</span><span class="text-sm font-bold font-mono" :class="saldos.bb < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.bb) }}</span></div>
-            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Caixa</span><span class="text-sm font-bold font-mono" :class="saldos.caixa < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.caixa) }}</span></div>
-            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">PIX</span><span class="text-sm font-bold font-mono" :class="saldos.pix < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.pix) }}</span></div>
-            <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-1"><span class="text-xs text-slate-500 font-bold uppercase">Dinheiro Físico</span><span class="text-sm font-bold font-mono" :class="saldos.dinheiro < 0 ? 'text-red-600' : 'text-emerald-700'">{{ formatMoney(saldos.dinheiro) }}</span></div>
+            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Banco do Brasil</span><span class="text-sm font-bold font-mono" :class="saldos.bb < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.bb) }}</span></div>
+            <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Caixa Econômica</span><span class="text-sm font-bold font-mono" :class="saldos.caixa < 0 ? 'text-red-600' : 'text-slate-700'">{{ formatMoney(saldos.caixa) }}</span></div>
+            <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-1"><span class="text-xs text-slate-500 font-bold uppercase">Dinheiro (Cofre/PIX)</span><span class="text-sm font-bold font-mono" :class="saldos.dinheiro < 0 ? 'text-red-600' : 'text-emerald-700'">{{ formatMoney(saldos.dinheiro) }}</span></div>
           </div>
         </div>
 
@@ -284,7 +294,7 @@ const exportar = () => {
                       'bg-sky-50 text-sky-700 border-sky-100': (item.origem || '').toLowerCase().includes('caixa') || (item.origem || '').toLowerCase().includes('ce'),
                       'bg-emerald-50 text-emerald-700 border-emerald-100': !(item.origem || '').toLowerCase().includes('brasil') && !(item.origem || '').toLowerCase().includes('caixa')
                     }">
-                    {{ item.origem || 'S/ Origem' }}
+                    {{ (item.origem || '').toUpperCase() === 'PIX' ? 'DINHEIRO' : (item.origem || 'S/ ORIGEM') }}
                   </span>
                 </td>
                 <td class="px-6 py-3 text-right font-bold text-emerald-600 bg-emerald-50/10">{{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}</td>
@@ -316,82 +326,54 @@ const exportar = () => {
         <div class="flex justify-between items-center mb-6 border-b border-black pb-4">
            <div>
              <h1 class="text-3xl font-bold">Relatório Financeiro</h1>
-             <p class="text-sm text-gray-500">Fluxo de Caixa e Saldos</p>
+             <p class="text-sm text-gray-500">Fluxo de Caixa e Saldos Consolidados</p>
            </div>
            <div class="text-right">
              <div class="text-sm font-bold">{{ new Date().toLocaleDateString('pt-BR') }}</div>
-             <div class="text-xs">{{ new Date().toLocaleTimeString('pt-BR') }}</div>
            </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-6 mb-8 text-sm">
-           
+        <div class="grid grid-cols-2 gap-6 mb-8 text-sm">
            <div class="border border-gray-300 p-3 rounded">
-              <div class="font-bold text-gray-600 text-xs uppercase mb-1">Saldo Disponível</div>
+              <div class="font-bold text-gray-600 text-xs uppercase mb-1">Saldos Disponíveis</div>
               <div class="text-2xl font-bold mb-2">{{ formatMoney(saldos.total) }}</div>
               <div class="text-xs space-y-1 text-gray-500 border-t pt-1 mt-1">
                  <div class="flex justify-between"><span>BB</span> <span>{{ formatMoney(saldos.bb) }}</span></div>
                  <div class="flex justify-between"><span>Caixa</span> <span>{{ formatMoney(saldos.caixa) }}</span></div>
-                 <div class="flex justify-between"><span>PIX</span> <span class="font-bold">{{ formatMoney(saldos.pix) }}</span></div>
-                 <div class="flex justify-between"><span>Dinheiro</span> <span>{{ formatMoney(saldos.dinheiro) }}</span></div>
-              </div>
-           </div>
-
-           <div class="border border-gray-300 p-3 rounded">
-              <div class="font-bold text-gray-600 text-xs uppercase mb-1">Cheques em Carteira</div>
-              <div class="text-2xl font-bold mb-2">{{ formatMoney(chequesCarteiraTotal) }}</div>
-              <div class="text-xs font-bold text-emerald-700 bg-emerald-50 p-1 rounded mt-2 text-center border border-emerald-100">
-                Patrimônio: {{ formatMoney(saldos.total + chequesCarteiraTotal) }}
+                 <div class="flex justify-between"><span>Dinheiro/Geral</span> <span>{{ formatMoney(saldos.dinheiro) }}</span></div>
               </div>
            </div>
 
            <div class="border border-gray-300 p-3 rounded bg-gray-50">
-              <div class="font-bold text-gray-600 text-xs uppercase mb-1">Resumo da Listagem</div>
-              <div class="space-y-1 mt-2">
-                <div class="flex justify-between"><span>Entradas:</span> <span class="font-bold text-emerald-600">{{ formatMoney(resumoFiltro.entradas) }}</span></div>
-                <div class="flex justify-between"><span>Saídas:</span> <span class="font-bold text-red-600">{{ formatMoney(resumoFiltro.saidas) }}</span></div>
-                <div class="flex justify-between border-t border-gray-300 pt-1 mt-1 font-bold text-base"><span>Resultado:</span> <span>{{ formatMoney(resumoFiltro.resultado) }}</span></div>
+              <div class="font-bold text-gray-600 text-xs uppercase mb-1">Patrimônio Líquido</div>
+              <div class="text-2xl font-bold mb-2">{{ formatMoney(saldos.total + chequesCarteiraTotal) }}</div>
+              <div class="text-xs text-gray-500 border-t pt-1 mt-1">
+                Inclui {{ formatMoney(chequesCarteiraTotal) }} em cheques aguardando compensação.
               </div>
            </div>
         </div>
 
         <table class="w-full text-left text-xs border-collapse">
           <thead>
-            <tr class="border-b-2 border-black">
-              <th class="py-2 w-24">Data</th>
-              <th class="py-2">Histórico</th>
-              <th class="py-2 w-24 text-center">Origem</th>
-              <th class="py-2 w-24 text-right">Entrada</th>
-              <th class="py-2 w-24 text-right">Saída</th>
+            <tr class="border-b-2 border-black font-bold uppercase">
+              <th class="py-2">Data</th>
+              <th class="py-2">Descrição</th>
+              <th class="py-2 text-center">Conta</th>
+              <th class="py-2 text-right">Entrada</th>
+              <th class="py-2 text-right">Saída</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in lancamentos" :key="item.id" class="border-b border-gray-200">
               <td class="py-2">{{ formatDate(item.data) }}</td>
               <td class="py-2 pr-2">{{ item.descricao }}</td>
-              <td class="py-2 text-center uppercase text-[10px]">{{ item.origem }}</td>
-              <td class="py-2 text-right font-bold text-emerald-700">
-                {{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}
-              </td>
-              <td class="py-2 text-right font-bold text-red-700">
-                {{ item.tipo === 'saida' ? formatMoney(item.valor) : '-' }}
-              </td>
+              <td class="py-2 text-center uppercase text-[9px]">{{ (item.origem || '').toUpperCase() === 'PIX' ? 'DINHEIRO' : (item.origem || 'GERAL') }}</td>
+              <td class="py-2 text-right font-bold">{{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}</td>
+              <td class="py-2 text-right font-bold">{{ item.tipo === 'saida' ? formatMoney(item.valor) : '-' }}</td>
             </tr>
           </tbody>
         </table>
-        
-        <div class="mt-8 pt-4 border-t border-black text-center text-xs text-gray-400">
-           Relatório gerado pelo sistema - Página 1 de 1
-        </div>
       </div>
     </div>
   </DashboardLayout>
 </template>
-
-<style>
-@media print {
-  body { background: white !important; }
-  .print-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 10mm; }
-  .print:hidden { display: none !important; }
-}
-</style>
