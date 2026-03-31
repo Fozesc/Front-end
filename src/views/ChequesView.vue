@@ -183,6 +183,28 @@ const abrirEdicao = (cheque) => {
   showModal.value = true;
 };
 
+
+const salvarCheque = async (dadosFormulario) => {
+  try {
+    loading.value = true;
+    if (chequeParaEditar.value) {
+      // Editar existente (sem barra no final)
+      await api.put(`/checks/${chequeParaEditar.value.id}`, dadosFormulario);
+    } else {
+      // Criar novo (SEM A BARRA NO FINAL AQUI)
+      await api.post('/checks', dadosFormulario); 
+    }
+    showModal.value = false;
+    carregarDados();
+  } catch (error) {
+    console.error(error);
+    alert(error.response?.data?.error || "Erro ao salvar o cheque.");
+  } finally {
+    loading.value = false;
+  }
+};
+// ==========================================
+
 const alterarStatus = (cheque, novoStatus) => {
   closeGlobalMenus();
   if (cheque.status === novoStatus) return;
@@ -291,7 +313,8 @@ const exportarTela = () => {
 <template>
   <DashboardLayout>
     <ChequeDetalhesModal v-if="showDetailsModal" :cheque="selectedCheque" :isOpen="showDetailsModal" @close="showDetailsModal = false" />
-    <ChequeForm v-if="showModal" :cheque="chequeParaEditar" @close="showModal = false" @save="() => { showModal = false; carregarDados(); }" />
+    
+    <ChequeForm v-if="showModal" :cheque="chequeParaEditar" @close="showModal = false" @save="salvarCheque" />
     
     <ProrrogacaoModal 
       v-if="showProrrogacaoModal" 
