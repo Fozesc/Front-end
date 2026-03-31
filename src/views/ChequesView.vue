@@ -43,7 +43,6 @@ const fetchSettings = async () => {
   try {
     const { data } = await api.get('/settings/');
     if (data) {
-      // Pega o valor exato salvo na tela de Configurações (o || 2.0 é só caso venha nulo/vazio do banco)
       taxaMulta.value = Number(data.fine_rate || data.taxa_multa || data.multa_devolucao || 2.0);
     }
   } catch (error) {
@@ -68,14 +67,18 @@ const confirmModal = reactive({
   title: '',
   message: '',
   action: null,
-  type: 'danger' 
+  type: 'danger',
+  showAccountSelect: false, // Controla se a caixa de conta aparece
+  selectedAccount: 'Dinheiro' // Valor padrão
 });
 
-const openConfirm = (title, message, actionCallback, type = 'danger') => {
+const openConfirm = (title, message, actionCallback, type = 'danger', showAccount = false) => {
   confirmModal.title = title;
   confirmModal.message = message;
   confirmModal.action = actionCallback;
   confirmModal.type = type;
+  confirmModal.showAccountSelect = showAccount;
+  confirmModal.selectedAccount = 'Dinheiro'; // Reseta sempre pra dinheiro ao abrir
   confirmModal.visible = true;
 };
 // --------------------------------------
@@ -159,7 +162,7 @@ const closeGlobalMenus = () => {
 };
 
 onMounted(() => {
-  fetchSettings(); // Busca a taxa do banco ao abrir a tela
+  fetchSettings(); 
   carregarDados();
   document.addEventListener('click', closeGlobalMenus);
   document.addEventListener('scroll', closeGlobalMenus, true);
@@ -187,27 +190,33 @@ const alterarStatus = (cheque, novoStatus) => {
   let title = `Alterar Status`;
   let msg = `Tem certeza que deseja mudar o status para "${novoStatus}"?`;
   let alertType = 'warning';
+  let requiresAccount = false;
+  let payloadData = {};
 
   if (novoStatus === 'Pago') {
     title = 'Confirmar Recebimento';
-    msg = `Você está prestes a dar baixa no cheque de ${formatCurrency(cheque.valor_liquido)}. Confirma o recebimento?`;
+    msg = `Você está prestes a dar baixa no cheque de ${formatCurrency(cheque.valor_bruto)}.`;
     alertType = 'success';
+    requiresAccount = true;
   } else if (novoStatus === 'Devolvido') {
     title = 'Confirmar Devolução';
-    // Multiplica a taxa que veio do banco pelo valor bruto do cheque
     const valorMultaCalculada = cheque.valor_bruto * (taxaMulta.value / 100);
-    msg = `Ao marcar como Devolvido, será cobrada uma multa de ${taxaMulta.value}% (${formatCurrency(valorMultaCalculada)}) do cliente. Deseja continuar?`;
+    msg = `Será cobrada uma multa de ${taxaMulta.value}% (${formatCurrency(valorMultaCalculada)}) do cliente.`;
     alertType = 'danger';
+    requiresAccount = true;
+    payloadData.taxa_multa = taxaMulta.value;
   }
 
   openConfirm(title, msg, async () => {
     try {
-      // Usamos a 'api' diretamente aqui para furar o bloqueio do checkService.js
-      // e garantir que a taxa de multa chegue 100% no servidor.
+      if (requiresAccount) {
+        payloadData.method = confirmModal.selectedAccount; // Adiciona o banco escolhido
+      }
+
       await api.patch(`/checks/${cheque.id}/status`, {
           status: novoStatus,
-          taxa_multa: taxaMulta.value, 
-          payment_data: { taxa_multa: taxaMulta.value }
+          taxa_multa: payloadData.taxa_multa, 
+          payment_data: payloadData // Manda tudo pro Backend
       });
       
       cheque.status = novoStatus; 
@@ -215,9 +224,9 @@ const alterarStatus = (cheque, novoStatus) => {
     } catch (error) { 
       alert("Erro ao atualizar o status do cheque."); 
     }
-  }, alertType);
+  }, alertType, requiresAccount);
 };
-// ------------------------------------------------
+
 const deletarCheque = (id) => {
   openConfirm(
     'Excluir Cheque', 
@@ -303,8 +312,18 @@ const exportarTela = () => {
         </div>
         
         <h3 class="text-xl font-bold text-slate-900 mb-2">{{ confirmModal.title }}</h3>
-        <p class="text-slate-500 mb-8">{{ confirmModal.message }}</p>
+        <p class="text-slate-500 mb-2">{{ confirmModal.message }}</p>
         
+        <div v-if="confirmModal.showAccountSelect" class="mt-4 mb-6 text-left bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Conta Destino</label>
+          <select v-model="confirmModal.selectedAccount" class="w-full bg-white border border-slate-300 rounded-lg py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700">
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="PIX">PIX</option>
+            <option value="BB">Banco do Brasil (BB)</option>
+            <option value="Caixa">Caixa Econômica</option>
+          </select>
+        </div>
+        <div v-else class="mb-6"></div>
         <div class="flex gap-3 justify-center">
           <button @click="confirmModal.visible = false" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors w-full">
             Cancelar
@@ -317,6 +336,7 @@ const exportarTela = () => {
         </div>
       </div>
     </div>
+    
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -429,7 +449,7 @@ const exportarTela = () => {
                   <div>{{ cheque.banco }}</div>
                   <div>Doc: {{ cheque.num_doc }}</div>
                 </td>
-                <td class="px-6 py-4 font-bold text-emerald-600 text-sm">{{ formatCurrency(cheque.valor_liquido) }}</td>
+                <td class="px-6 py-4 font-bold text-emerald-600 text-sm">{{ formatCurrency(cheque.valor_bruto) }}</td>
                 <td class="px-6 py-4 text-center">
                   <button @click="toggleStatusMenu(cheque, $event)" :class="['px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1 mx-auto w-28 justify-between', getStatusColor(cheque.status)]">
                      {{ cheque.status }} <ChevronDown class="w-3 h-3 opacity-50"/>
@@ -481,7 +501,7 @@ const exportarTela = () => {
               <td class="py-2">{{ formatDate(cheque.vencimento) }}</td>
               <td class="py-2">{{ cheque.cliente }}</td>
               <td class="py-2">{{ cheque.banco }} - {{ cheque.num_doc }}</td>
-              <td class="py-2 text-right">{{ formatCurrency(cheque.valor_liquido) }}</td>
+              <td class="py-2 text-right">{{ formatCurrency(cheque.valor_bruto) }}</td>
               <td class="py-2 text-center font-bold text-xs">{{ cheque.status }}</td>
             </tr>
           </tbody>
