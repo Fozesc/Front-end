@@ -33,7 +33,7 @@ const resumoFiltro = ref({ entradas: 0, saidas: 0, resultado: 0 });
 // REMOVIDO PIX DOS SALDOS - AGORA É INCORPORADO NO DINHEIRO
 const saldos = ref({ bb: 0, caixa: 0, dinheiro: 0, total: 0 }); 
 const chequesCarteiraTotal = ref(0);
-const capitalInvestido = ref(0);
+const capitalTotal = ref(0); // SUBSTITUÍDO: capitalInvestido por capitalTotal
 
 const filtros = reactive({
   texto: '',
@@ -68,23 +68,24 @@ const carregarTabela = async () => {
 
 const carregarSaldos = async () => {
   try {
-    const [resSaldos, resCheques, resSettings] = await Promise.all([
+    const [resSaldos, resCheques] = await Promise.all([
       transactionService.getBalances(),
-      checkService.getPortfolioTotal(),
-      settingsService.get()
+      checkService.getPortfolioTotal()
     ]);
     
-    // LÓGICA DE UNIFICAÇÃO: Soma PIX ao Dinheiro caso o backend ainda envie separado
-    const saldoUnificado = {
-        bb: resSaldos.bb || 0,
-        caixa: resSaldos.caixa || 0,
-        dinheiro: (resSaldos.dinheiro || 0) + (resSaldos.pix || 0),
-        total: resSaldos.total || 0
+    // Atualiza os saldos individuais
+    saldos.value = {
+        bb: resSaldos.bb,
+        caixa: resSaldos.caixa,
+        dinheiro: resSaldos.dinheiro,
+        total: resSaldos.total // Este é o Disponível
     };
 
-    saldos.value = saldoUnificado;
     chequesCarteiraTotal.value = resCheques.total_portfolio || 0;
-    capitalInvestido.value = resSettings.capital_social || 0;
+    
+    // ATENÇÃO AQUI: capitalTotal recebe o valor calculado pelo backend
+    capitalTotal.value = resSaldos.capital_total; 
+    
   } catch (e) { console.error("Erro saldos:", e); }
 };
 
@@ -227,10 +228,6 @@ const exportar = () => {
           <div class="mt-3 text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded inline-block font-bold">Patrimônio: {{ formatMoney(saldos.total + chequesCarteiraTotal) }}</div>
         </div>
 
-        <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col justify-center">
-          <span class="text-xs font-bold uppercase text-slate-400 mb-1">Capital Investido</span>
-          <div class="text-xl font-bold text-slate-700">{{ formatMoney(capitalInvestido) }}</div>
-        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -330,10 +327,12 @@ const exportar = () => {
            </div>
            <div class="text-right">
              <div class="text-sm font-bold">{{ new Date().toLocaleDateString('pt-BR') }}</div>
+             <div class="text-xs">{{ new Date().toLocaleTimeString('pt-BR') }}</div>
            </div>
         </div>
 
         <div class="grid grid-cols-2 gap-6 mb-8 text-sm">
+           
            <div class="border border-gray-300 p-3 rounded">
               <div class="font-bold text-gray-600 text-xs uppercase mb-1">Saldos Disponíveis</div>
               <div class="text-2xl font-bold mb-2">{{ formatMoney(saldos.total) }}</div>
