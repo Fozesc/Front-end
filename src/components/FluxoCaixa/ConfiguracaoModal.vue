@@ -1,7 +1,7 @@
 <script setup>
 import { reactive, onMounted } from 'vue';
 import { X, Save } from 'lucide-vue-next';
-import settingsService from '../../services/settingsService'; 
+import transactionService from '../../services/transactionService'; 
 
 const emit = defineEmits(['close', 'save']);
 
@@ -14,25 +14,39 @@ const form = reactive({
 
 onMounted(async () => {
   try {
-    const dados = await settingsService.get();
+    // Buscamos os saldos atuais através do service de transação
+    const dados = await transactionService.getBalances();
     if (dados) {
-      form.capital_social = dados.capital_social || 0;
-      form.saldo_inicial_bb = dados.saldo_inicial_bb || 0;
-      form.saldo_inicial_ce = dados.saldo_inicial_ce || 0;
-      form.saldo_inicial_caixa = dados.saldo_inicial_caixa || 0;
+      // Mapeia o que vem do banco para o formulário
+      // 'capital_investido' é como o seu backend retorna no get_balances
+      form.capital_social = dados.capital_investido || 0;
+      form.saldo_inicial_bb = dados.bb || 0;
+      form.saldo_inicial_ce = dados.caixa || 0;
+      form.saldo_inicial_caixa = dados.dinheiro || 0;
     }
   } catch (error) {
-    console.error("Erro ao carregar configurações", error);
+    console.error("Erro ao carregar saldos iniciais", error);
   }
 });
 
 const salvar = async () => {
   try {
-    await settingsService.update(form);
-    emit('save'); 
+    // Garantimos que os valores sejam números antes de enviar
+    const payload = {
+      capital_social: Number(form.capital_social),
+      saldo_inicial_bb: Number(form.saldo_inicial_bb),
+      saldo_inicial_ce: Number(form.saldo_inicial_ce),
+      saldo_inicial_caixa: Number(form.saldo_inicial_caixa)
+    };
+
+    // Chamamos a rota de update de saldos iniciais no transactionService
+    await transactionService.saveInitialBalances(payload);
+    
+    emit('save'); // Faz o Dashboard recarregar os cards
     emit('close');
   } catch (error) {
-    alert("Erro ao salvar configurações.");
+    console.error(error);
+    alert("Erro ao salvar saldos iniciais.");
   }
 };
 </script>
@@ -84,3 +98,8 @@ const salvar = async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.animate-scale-in { animation: scaleIn 0.2s ease-out; }
+@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>

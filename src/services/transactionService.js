@@ -25,5 +25,9 @@ export default {
     delete: async (id) => {
         const response = await api.delete(`/transactions/${id}`);
         return response.data;
+    },
+    saveInitialBalances: async (data) => {
+        const response = await api.put('/transactions/initial-balances', data);
+        return response.data;
     }
 };
