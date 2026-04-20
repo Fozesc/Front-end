@@ -201,7 +201,7 @@ onMounted(() => {
         </div>
         
         <div class="p-6 space-y-4">
-          <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label><input v-model="userForm.name" type="text" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Lucas Quadros" /></div>
+          <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label><input v-model="userForm.name" type="text" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nome Completo" /></div>
           <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email (Login)</label><input v-model="userForm.email" type="email" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="usuario@fozesc.com" /></div>
           
           <div>
