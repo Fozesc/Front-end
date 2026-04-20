@@ -36,10 +36,17 @@ onMounted(() => {
 const salvar = () => {
   if (!form.descricao || !form.valor) return alert("Preencha descrição e valor");
   
+
+  let valorFinal = Math.abs(parseFloat(form.valor));
+
+
+  if (form.tipo === 'saida') {
+    valorFinal = valorFinal * -1;
+  }
+
   emit('save', {
     ...form,
-    // Garante que o valor seja enviado como número
-    valor: parseFloat(form.valor)
+    valor: valorFinal
   });
 };
 </script>
