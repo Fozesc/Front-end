@@ -253,6 +253,11 @@ const exportarFicha = () => {
               <div class="text-slate-500 text-xs mb-1 flex items-center gap-1"><MapPin class="w-3 h-3"/> Endereço</div>
               <div class="text-slate-800 leading-tight text-xs">{{ enderecoCompleto }}</div>
             </div>
+            
+            <div class="pt-2 mt-2 border-t border-slate-100">
+              <div class="text-slate-500 text-xs mb-1 font-bold">Observações</div>
+              <div class="text-slate-800 leading-tight text-xs italic">{{ cliente.obs || '-' }}</div>
+            </div>
             </div>
         </div>
 
