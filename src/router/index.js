@@ -9,7 +9,8 @@ import ClienteDetalhesView from '../views/ClienteDetalhesView.vue'
 import ChequesView from '../views/ChequesView.vue'
 import FluxoCaixaView from '../views/FluxoCaixaView.vue'
 import ConfiguracoesView from '../views/ConfiguracoesView.vue'
-import AuditView from '../views/AuditView.vue' 
+import AuditView from '../views/AuditView.vue'
+import HistoricoView from '../views/HistoricoView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -65,6 +66,12 @@ const router = createRouter({
       path: '/auditoria',
       name: 'auditoria',
       component: AuditView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/historico',
+      name: 'historico',
+      component: HistoricoView,
       meta: { requiresAuth: true }
     }
   ]

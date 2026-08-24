@@ -15,7 +15,8 @@ import {
   Wallet,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  CalendarClock
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Borderô', path: '/bordero', icon: Calculator },
   { name: 'Clientes', path: '/clientes', icon: Users },
   { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
+  { name: 'Histórico Mensal', path: '/historico', icon: CalendarClock },
   { name: 'Auditoria', path: '/auditoria', icon: ShieldCheck }
 ];
 
