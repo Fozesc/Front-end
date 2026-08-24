@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted, reactive, watch } from 'vue';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
-import { 
-  ShieldCheck, Search, Activity, User, Eye, X, 
-  ChevronDown, RotateCcw, Filter, ArrowLeft, ArrowRight, Loader2
+import {
+  ShieldCheck, Search, Activity, User, Eye, X,
+  ChevronDown, RotateCcw, Filter, ArrowLeft, ArrowRight, Loader2,
+  Clock, Target, Hash, FileText, Plus, Pencil, Trash2, LogIn
 } from 'lucide-vue-next';
 import auditService from '../services/auditService';
 
@@ -89,6 +90,21 @@ const getActionStyle = (action) => {
   }
 };
 
+const getActionIcon = (action) => {
+  switch(action) {
+    case 'CREATE': return Plus;
+    case 'UPDATE': return Pencil;
+    case 'DELETE': return Trash2;
+    case 'LOGIN': return LogIn;
+    default: return Activity;
+  }
+};
+
+const getActionLabel = (action) => {
+  const map = { CREATE: 'Criação', UPDATE: 'Edição', DELETE: 'Exclusão', LOGIN: 'Login', LOGOUT: 'Logout' };
+  return map[action] || action;
+};
+
 const formatDate = (iso) => {
   if(!iso) return '-';
   return new Date(iso).toLocaleString('pt-BR');
@@ -101,27 +117,54 @@ const formatDate = (iso) => {
     <div v-if="selectedLog" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="selectedLog = null"></div>
       <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
-        <div class="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start">
-          <div>
-            <span :class="getActionStyle(selectedLog.action)" class="px-2 py-1 rounded text-xs font-bold border uppercase tracking-wide mb-2 inline-block">
-              {{ selectedLog.action }}
-            </span>
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              Detalhes da Auditoria <span class="text-slate-400 text-sm font-normal">#{{ selectedLog.id }}</span>
-            </h3>
-            <p class="text-sm text-slate-500 mt-1">Realizado por <b>{{ selectedLog.user }}</b> em {{ formatDate(selectedLog.date) }}</p>
+
+        <!-- Header com ícone da ação -->
+        <div class="p-6 border-b border-slate-100 flex justify-between items-start bg-gradient-to-br from-slate-50 to-white">
+          <div class="flex items-center gap-4">
+            <div :class="getActionStyle(selectedLog.action)" class="w-12 h-12 rounded-xl border flex items-center justify-center flex-shrink-0">
+              <component :is="getActionIcon(selectedLog.action)" class="w-6 h-6" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span :class="getActionStyle(selectedLog.action)" class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide">
+                  {{ getActionLabel(selectedLog.action) }}
+                </span>
+                <span class="text-slate-400 text-xs font-mono flex items-center"><Hash class="w-3 h-3" />{{ selectedLog.id }}</span>
+              </div>
+              <h3 class="text-xl font-bold text-slate-800 mt-1">Detalhes do Registro</h3>
+            </div>
           </div>
           <button @click="selectedLog = null" class="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
             <X class="w-6 h-6" />
           </button>
         </div>
-        <div class="p-8 overflow-y-auto">
-          <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 font-mono text-xs md:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-            {{ selectedLog.details }}
+
+        <div class="p-6 overflow-y-auto space-y-6">
+          <!-- Cards de metadados -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div class="flex items-center gap-1.5 text-slate-400 mb-1"><User class="w-3.5 h-3.5" /><span class="text-[10px] font-bold uppercase tracking-wide">Usuário</span></div>
+              <div class="font-bold text-slate-800 text-sm truncate">{{ selectedLog.user }}</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div class="flex items-center gap-1.5 text-slate-400 mb-1"><Target class="w-3.5 h-3.5" /><span class="text-[10px] font-bold uppercase tracking-wide">Alvo</span></div>
+              <div class="font-bold text-slate-800 text-sm truncate">{{ selectedLog.target }}</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div class="flex items-center gap-1.5 text-slate-400 mb-1"><Clock class="w-3.5 h-3.5" /><span class="text-[10px] font-bold uppercase tracking-wide">Data / Hora</span></div>
+              <div class="font-bold text-slate-800 text-sm">{{ formatDate(selectedLog.date) }}</div>
+            </div>
+          </div>
+
+          <!-- Detalhes -->
+          <div>
+            <div class="flex items-center gap-1.5 text-slate-500 mb-2"><FileText class="w-4 h-4" /><span class="text-xs font-bold uppercase tracking-wide">Descrição do evento</span></div>
+            <div class="bg-slate-900 rounded-xl p-5 font-mono text-xs md:text-sm text-slate-100 whitespace-pre-wrap leading-relaxed shadow-inner">{{ selectedLog.details }}</div>
           </div>
         </div>
+
         <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button @click="selectedLog = null" class="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900">Fechar</button>
+          <button @click="selectedLog = null" class="px-6 py-2 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors">Fechar</button>
         </div>
       </div>
     </div>

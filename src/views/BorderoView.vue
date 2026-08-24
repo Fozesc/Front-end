@@ -272,7 +272,8 @@ const processarSalvamento = async () => {
       taxa_mensal: header.taxaMensal,
       dias_compensacao: header.diasCompensacao,
       account_source: header.contaSaida,
-      iof_amount: totais.value.iof, 
+      iof_amount: totais.value.iof,
+      total_net: totais.value.liquido, // valor realmente emprestado (o que sai do caixa) = face - juros - IOF
       notes: header.observacao,
       checks: itens.value.map(item => ({
         valor: item.valor, vencimento: item.vencimento,
