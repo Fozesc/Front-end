@@ -16,5 +16,14 @@ export default {
   },
   delete(id) {
     return api.delete(`/checks/${id}`).then(res => res.data);
+  },
+  // Edicao de nome/datas: o backend exige a senha de quem esta logado no corpo.
+  update(id, data) {
+    return api.put(`/checks/${id}`, data).then(res => res.data);
+  },
+  // Tira/devolve cheques do calculo em lote. Ou `ids` (marcados na tela), ou
+  // `filtros` (todos os que batem com o filtro atual) - nunca os dois.
+  definirCalculo(payload) {
+    return api.patch('/checks/calculo', payload).then(res => res.data);
   }
 };

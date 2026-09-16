@@ -196,7 +196,7 @@ const chartOptionsLine = {
           <span class="text-xs font-bold text-slate-500 uppercase">Lucro Acumulado</span>
         </div>
         <div class="text-2xl font-bold text-slate-900">{{ formatMoney(kpis.lucro) }}</div>
-        <div class="text-xs text-emerald-600 font-medium flex items-center mt-1">Total de Juros</div>
+        <div class="text-xs text-emerald-600 font-medium flex items-center mt-1">Juros de cheques já pagos</div>
       </div>
 
       <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">

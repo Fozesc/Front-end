@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ChequeForm from '../components/layout/finance/ChequeForm.vue'; 
+import EditarChequeModal from '../components/layout/finance/EditarChequeModal.vue';
 import ChequeDetalhesModal from '../components/layout/finance/ChequeDetalhesModal.vue';
 import ProrrogacaoModal from '../components/layout/finance/ProrrogacaoModal.vue'; 
 import api from '../services/api';
@@ -11,7 +12,7 @@ import {
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock, AlertTriangle 
+  Edit, Download, CalendarClock, AlertTriangle, Archive, RotateCcw, Pencil
 } from 'lucide-vue-next';
 
 import checkService from '../services/checkService';
@@ -26,6 +27,10 @@ const isPrinting = ref(false);
 const showProrrogacaoModal = ref(false);
 const chequeParaProrrogar = ref(null);
 const chequeParaEditar = ref(null);
+const showEditModal = ref(false);
+
+// Cheques marcados na tela para a acao em lote (tirar/devolver ao calculo).
+const selecionados = ref([]);
 
 const openStatusMenuId = ref(null);
 const menuPosition = reactive({ top: 0, left: 0 });
@@ -55,6 +60,7 @@ const filters = reactive({
   status: [], 
   date_start: new Date().toISOString().split('T')[0], 
   date_end: '',
+  calculo: '',        // '' = todos | 'dentro' = so os que contam | 'fora' = so historico
   sort_by: 'due_date',
   sort_order: 'asc'
 });
@@ -91,9 +97,11 @@ const carregarDados = async () => {
       status: filters.status.length > 0 ? filters.status.join(',') : '', 
       date_start: filters.date_start,
       date_end: filters.date_end,
+      calculo: filters.calculo,
       sort_by: filters.sort_by,
       sort_order: filters.sort_order
     };
+    selecionados.value = [];
     const response = await checkService.getAll(params);
     dados.value = response.items;
     totalItems.value = response.total;
@@ -136,7 +144,7 @@ watch(() => filters.search, () => {
   }, 400); 
 });
 
-watch([() => filters.status, () => filters.date_start, () => filters.date_end], () => {
+watch([() => filters.status, () => filters.date_start, () => filters.date_end, () => filters.calculo], () => {
   currentPage.value = 1;
   carregarDados();
 }, { deep: true });
@@ -161,15 +169,15 @@ onMounted(() => {
   document.addEventListener('scroll', closeGlobalMenus, true);
 });
 
-const abrirNovo = () => { chequeParaEditar.value = null; showModal.value = true; };
+const abrirNovo = () => { showModal.value = true; };
 const abrirProrrogacao = (cheque) => { chequeParaProrrogar.value = cheque; showProrrogacaoModal.value = true; };
-const abrirEdicao = (cheque) => { chequeParaEditar.value = { ...cheque }; showModal.value = true; };
 
 const salvarCheque = async (dadosFormulario) => {
   try {
     loading.value = true;
-    if (chequeParaEditar.value) await api.put(`/checks/${chequeParaEditar.value.id}`, dadosFormulario);
-    else await api.post('/checks', dadosFormulario); 
+    // Só criação: o ChequeForm é o formulário de cheque manual (não preenche cheque
+    // existente). A edição de cheque agora é o EditarChequeModal, que pede a senha.
+    await api.post('/checks', dadosFormulario);
     showModal.value = false;
     carregarDados();
   } catch (error) {
@@ -222,6 +230,62 @@ const alterarStatus = (cheque, novoStatus) => {
   }, alertType, requiresAccount);
 };
 
+// ---------------------------------------------------------------- SELECAO
+const isSelecionado = (id) => selecionados.value.includes(id);
+const toggleSelecao = (id) => {
+  selecionados.value = isSelecionado(id)
+    ? selecionados.value.filter(x => x !== id)
+    : [...selecionados.value, id];
+};
+const todosDaPaginaMarcados = () => dados.value.length > 0 && dados.value.every(c => isSelecionado(c.id));
+const toggleSelecaoPagina = () => {
+  selecionados.value = todosDaPaginaMarcados() ? [] : dados.value.map(c => c.id);
+};
+
+// ------------------------------------------------- FORA DO CALCULO (LOTE)
+// Dois escopos: os cheques marcados na tela, ou TODOS os que batem com o filtro
+// atual (e' assim que "todos os do Juridico" vira um clique).
+const aplicarCalculo = (fora, escopo) => {
+  const usandoSelecao = escopo === 'selecionados';
+  const quantos = usandoSelecao ? selecionados.value.length : totalItems.value;
+
+  if (!quantos) { alert('Nenhum cheque para alterar.'); return; }
+
+  const acao = fora
+    ? 'TIRAR do cálculo (viram histórico: saem do lucro, da carteira, da inadimplência e do Histórico Mensal)'
+    : 'VOLTAR ao cálculo (passam a contar em todos os números do sistema)';
+
+  openConfirm(
+    fora ? 'Tirar do cálculo' : 'Voltar ao cálculo',
+    `${quantos} cheque(s) vão ${acao}. Nenhum dado é apagado — dá para desfazer clicando no botão oposto.`,
+    async () => {
+      try {
+        const payload = usandoSelecao
+          ? { fora, ids: selecionados.value }
+          : { fora, filtros: {
+                search: filters.search,
+                status: filters.status.join(','),
+                date_start: filters.date_start,
+                date_end: filters.date_end,
+                calculo: filters.calculo
+              } };
+        const r = await checkService.definirCalculo(payload);
+        selecionados.value = [];
+        await carregarDados();
+        alert(`${r.alterados} cheque(s) atualizado(s).`);
+      } catch (e) {
+        alert(e.response?.data?.error || 'Erro ao aplicar a alteração.');
+      }
+    },
+    fora ? 'warning' : 'success'
+  );
+};
+
+const abrirEdicaoCheque = (cheque) => {
+  chequeParaEditar.value = cheque;
+  showEditModal.value = true;
+};
+
 const deletarCheque = (id) => {
   openConfirm('Excluir Cheque', 'Esta ação não pode ser desfeita.', async () => {
     try { await checkService.delete(id); carregarDados(); } catch (e) { alert("Erro ao excluir."); }
@@ -251,6 +315,7 @@ const toggleStatusMenu = (cheque, event) => {
 
 const resetFilters = () => {
     filters.search = ''; filters.status = []; filters.date_start = ''; filters.date_end = '';
+    filters.calculo = '';
     currentPage.value = 1; carregarDados();
 };
 
@@ -263,7 +328,10 @@ const exportarTela = () => {
 <template>
   <DashboardLayout>
     <ChequeDetalhesModal v-if="showDetailsModal" :cheque="selectedCheque" :isOpen="showDetailsModal" @close="showDetailsModal = false" />
-    <ChequeForm v-if="showModal" :cheque="chequeParaEditar" @close="showModal = false" @save="salvarCheque" />
+    <ChequeForm v-if="showModal" @close="showModal = false" @save="salvarCheque" />
+    <EditarChequeModal v-if="showEditModal && chequeParaEditar" :cheque="chequeParaEditar"
+                       @close="showEditModal = false"
+                       @saved="() => { showEditModal = false; carregarDados(); }" />
     <ProrrogacaoModal v-if="showProrrogacaoModal" :cheque="chequeParaProrrogar" :isOpen="showProrrogacaoModal" @close="showProrrogacaoModal = false" @save="() => { showProrrogacaoModal = false; carregarDados(); }" />
 
     <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -317,14 +385,14 @@ const exportarTela = () => {
       </div>
 
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-        <div class="md:col-span-4 relative">
+        <div class="md:col-span-3 relative">
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Busca</label>
           <Search class="w-4 h-4 absolute left-3 top-8 text-slate-400" />
           <input v-model="filters.search" type="text" placeholder="Nome, Banco, Doc..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
         </div>
         <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-500 uppercase mb-1">De</label><input v-model="filters.date_start" type="date" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
         <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Até</label><input v-model="filters.date_end" type="date" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
-        <div class="md:col-span-3 relative">
+        <div class="md:col-span-2 relative">
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
           <button @click.stop="showStatusFilter = !showStatusFilter" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm flex justify-between items-center">
             <span class="truncate">{{ filters.status.length === 0 ? 'Todos' : filters.status.length + ' selecionados' }}</span>
@@ -338,7 +406,37 @@ const exportarTela = () => {
             </div>
           </div>
         </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cálculo</label>
+          <select v-model="filters.calculo" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700">
+            <option value="">Todos</option>
+            <option value="dentro">Só os que contam</option>
+            <option value="fora">Só histórico (fora)</option>
+          </select>
+        </div>
         <div class="md:col-span-1"><button @click="resetFilters" class="w-full py-2 text-slate-400 hover:text-red-500 text-xs font-bold">Limpar</button></div>
+      </div>
+
+      <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="text-xs text-slate-600">
+          <template v-if="selecionados.length">
+            <strong class="text-slate-900">{{ selecionados.length }}</strong> cheque(s) marcado(s) &middot;
+            <button @click="selecionados = []" class="font-bold text-indigo-600 hover:underline">limpar seleção</button>
+          </template>
+          <template v-else>
+            Nada marcado — a ação vale para os <strong class="text-slate-900">{{ totalItems }}</strong> cheque(s) do filtro atual.
+          </template>
+        </div>
+        <div class="flex gap-2">
+          <button @click="aplicarCalculo(true, selecionados.length ? 'selecionados' : 'filtrados')"
+                  class="bg-slate-800 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-slate-900">
+            <Archive class="w-4 h-4 mr-2" /> Tirar do cálculo
+          </button>
+          <button @click="aplicarCalculo(false, selecionados.length ? 'selecionados' : 'filtrados')"
+                  class="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-slate-50">
+            <RotateCcw class="w-4 h-4 mr-2" /> Voltar ao cálculo
+          </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
@@ -346,6 +444,12 @@ const exportarTela = () => {
           <table class="w-full text-left whitespace-nowrap">
             <thead class="bg-slate-50 border-b border-slate-200">
               <tr class="text-xs font-bold text-slate-500 uppercase">
+                <th class="px-4 py-3">
+                  <button @click="toggleSelecaoPagina" class="text-slate-400 hover:text-indigo-600" title="Marcar/desmarcar a página">
+                    <CheckSquare v-if="todosDaPaginaMarcados()" class="w-4 h-4 text-indigo-600" />
+                    <Square v-else class="w-4 h-4" />
+                  </button>
+                </th>
                 <th class="px-6 py-3">Op #</th>
                 <th @click="ordenar('due_date')" class="px-6 py-3 cursor-pointer hover:bg-slate-100">Vencimento</th>
                 <th @click="ordenar('issuer_name')" class="px-6 py-3 cursor-pointer hover:bg-slate-100">Cliente / Emitente</th>
@@ -356,10 +460,24 @@ const exportarTela = () => {
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="cheque in dados" :key="cheque.id" @click="abrirDetalhes(cheque)" class="hover:bg-indigo-50 cursor-pointer transition-colors text-sm">
+              <tr v-for="cheque in dados" :key="cheque.id" @click="abrirDetalhes(cheque)"
+                  :class="['hover:bg-indigo-50 cursor-pointer transition-colors text-sm', cheque.fora_do_calculo ? 'bg-slate-50/70' : '']">
+                <td class="px-4 py-4" @click.stop="toggleSelecao(cheque.id)">
+                  <button class="text-slate-300 hover:text-indigo-600">
+                    <CheckSquare v-if="isSelecionado(cheque.id)" class="w-4 h-4 text-indigo-600" />
+                    <Square v-else class="w-4 h-4" />
+                  </button>
+                </td>
                 <td class="px-6 py-4 text-xs font-mono font-bold text-indigo-600">#{{ cheque.operation_id }}</td>
                 <td class="px-6 py-4 font-bold text-slate-700">{{ formatDate(cheque.vencimento) }}</td>
-                <td class="px-6 py-4"><div class="font-bold text-slate-900">{{ cheque.cliente }}</div><div class="text-xs text-slate-500">{{ cheque.emitente }}</div></td>
+                <td class="px-6 py-4">
+                  <div class="font-bold text-slate-900">{{ cheque.cliente }}</div>
+                  <div class="text-xs text-slate-500">{{ cheque.emitente }}</div>
+                  <div v-if="cheque.fora_do_calculo || cheque.importado" class="flex gap-1 mt-1">
+                    <span v-if="cheque.fora_do_calculo" class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-black uppercase tracking-tight">fora do cálculo</span>
+                    <span v-if="cheque.importado" class="px-1.5 py-0.5 rounded border border-indigo-200 text-indigo-600 text-[9px] font-black uppercase tracking-tight">importado</span>
+                  </div>
+                </td>
                 <td class="px-6 py-4 text-xs text-slate-600"><div>{{ cheque.banco }}</div><div>Doc: {{ cheque.num_doc }}</div></td>
                 <td class="px-6 py-4 font-bold text-emerald-600">{{ formatCurrency(cheque.valor_bruto) }}</td>
                 <td class="px-6 py-4 text-center">
@@ -369,6 +487,7 @@ const exportarTela = () => {
                 </td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end gap-1">
+                    <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-2 text-slate-300 hover:text-amber-600 transition-colors"><Pencil class="w-4 h-4"/></button>
                     <button @click.stop="abrirProrrogacao(cheque)" class="p-2 text-slate-300 hover:text-indigo-600 transition-colors"><CalendarClock class="w-4 h-4"/></button>
                     <button @click.stop="deletarCheque(cheque.id)" class="p-2 text-slate-300 hover:text-red-600 transition-colors"><Trash2 class="w-4 h-4"/></button>
                   </div>

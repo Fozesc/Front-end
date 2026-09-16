@@ -17,4 +17,9 @@ export default {
     update(id, data) {
         return api.put(`/clients/${id}`, data);
     },
+
+    // junta dois cadastros do mesmo cliente (exige a senha de quem esta logado)
+    merge(data) {
+        return api.post('/clients/merge', data);
+    },
 };

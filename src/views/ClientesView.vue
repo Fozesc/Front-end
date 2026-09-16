@@ -5,9 +5,10 @@ import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Plus, Search, Printer, Edit2, 
   AlertTriangle, AlertCircle, X, Loader2,
-  ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone
+  ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone, Merge
 } from 'lucide-vue-next';
 import clientService from '../services/clientService';
+import MesclarClienteModal from '../components/layout/finance/MesclarClienteModal.vue';
 
 const router = useRouter();
 
@@ -25,6 +26,8 @@ const filters = reactive({
 });
 
 const showModal = ref(false); 
+const clienteParaMesclar = ref(null);
+const avisoMerge = ref('');
 const saving = ref(false);
 
 // --- ATUALIZADO: Campos de endereço adicionados ao form ---
@@ -145,6 +148,14 @@ const getLimitColor = (usado, limite) => {
   if (porc > 80) return 'bg-amber-500';
   return 'bg-emerald-500';
 };
+const aoMesclar = async (r) => {
+  clienteParaMesclar.value = null;
+  avisoMerge.value = `"${r.apagado}" foi juntado em "${r.mantido}": `
+    + `${r.borderos} borderô(s) e ${r.cheques} cheque(s) transferidos.`;
+  await fetchClientes();
+  setTimeout(() => { avisoMerge.value = ''; }, 8000);
+};
+
 const exportarLista = async () => { isPrinting.value = true; await nextTick(); window.print(); isPrinting.value = false; };
 </script>
 
@@ -184,6 +195,10 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
         <button @click="resetFilters" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Limpar">
           <RotateCcw class="w-5 h-5" />
         </button>
+      </div>
+
+      <div v-if="avisoMerge" class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm font-semibold flex items-center">
+        <Merge class="w-4 h-4 mr-2 shrink-0" /> {{ avisoMerge }}
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
@@ -262,7 +277,8 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
 
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end gap-2">
-                    <button @click.stop="abrirModal(cliente.id)" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 class="w-4 h-4" /></button>
+                    <button @click.stop="abrirModal(cliente.id)" title="Editar cadastro" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 class="w-4 h-4" /></button>
+                    <button @click.stop="clienteParaMesclar = cliente" title="Juntar com outro cadastro do mesmo cliente" class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"><Merge class="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -390,6 +406,9 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
         </div>
       </div>
     </div>
+
+    <MesclarClienteModal v-if="clienteParaMesclar" :cliente="clienteParaMesclar"
+                         @close="clienteParaMesclar = null" @merged="aoMesclar" />
 
     <Teleport to="body">
       <div v-if="isPrinting" class="print-overlay">
