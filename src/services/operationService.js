@@ -1,8 +1,11 @@
 import  api  from './api';
 
 export default {
-    getAll() {
-        return api.get('/operations').then(res => res.data);
+    // Os parametros (page, per_page, sort_by, sort_order) eram recebidos aqui e
+    // jogados fora - a chamada ia sem nada e o backend devolvia TODOS os borderos.
+    // Agora sao repassados de verdade.
+    getAll(params = {}) {
+        return api.get('/operations', { params }).then(res => res.data);
     },
 
    
