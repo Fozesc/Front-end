@@ -1,5 +1,5 @@
 <script setup>
-import { X, Calendar, User, CreditCard, FileText, Activity, Clock, CheckCircle, History, ArrowRight } from 'lucide-vue-next';
+import { X, Calendar, User, CreditCard, FileText, Activity, Clock, CheckCircle, History, ArrowRight, Split } from 'lucide-vue-next';
 
 const props = defineProps({
   cheque: Object,
@@ -10,6 +10,14 @@ const emit = defineEmits(['close']);
 
 const formatMoney = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
+
+// % da parte sobre o valor recebido (recebimento dividido)
+const percentual = (valor) => {
+  const total = Number(props.cheque?.valor_pago) || Number(props.cheque?.valor_bruto) || 0;
+  if (!total) return '';
+  const p = (Number(valor) || 0) / total * 100;
+  return `${p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)}%`;
+};
 </script>
 
 <template>
@@ -99,6 +107,32 @@ const formatDate = (val) => val ? val.split('-').reverse().join('/') : '-';
                  </div>
                </div>
            </div>
+        </div>
+
+        <div v-if="cheque.partes_pagamento && cheque.partes_pagamento.length" class="rounded-xl border border-emerald-200 bg-emerald-50/50 overflow-hidden">
+          <div class="px-4 py-2.5 bg-emerald-100/70 flex items-center gap-2">
+            <Split class="w-4 h-4 text-emerald-700" />
+            <span class="text-[11px] font-black text-emerald-800 uppercase tracking-wide">
+              Recebido em {{ cheque.partes_pagamento.length }} partes
+            </span>
+          </div>
+          <table class="w-full text-xs">
+            <tbody class="divide-y divide-emerald-100">
+              <tr v-for="(p, i) in cheque.partes_pagamento" :key="i">
+                <td class="px-4 py-2 text-slate-500 font-bold">{{ i + 1 }}ª</td>
+                <td class="px-2 py-2">
+                  <span class="px-2 py-0.5 rounded bg-white border border-emerald-200 text-emerald-800 font-black uppercase text-[10px]">
+                    {{ p.conta }}
+                  </span>
+                </td>
+                <td class="px-2 py-2 text-slate-500 uppercase text-[10px] font-bold">
+                  {{ p.forma && p.forma !== p.conta ? p.forma : '' }}
+                </td>
+                <td class="px-2 py-2 text-right text-slate-400 font-bold">{{ percentual(p.valor) }}</td>
+                <td class="px-4 py-2 text-right font-black text-emerald-700">{{ formatMoney(p.valor) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div v-if="cheque.observacao" class="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">

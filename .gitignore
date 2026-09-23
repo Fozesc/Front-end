@@ -16,6 +16,16 @@ dist
 dist-ssr
 *.local
 
+# planilhas, exportacoes e dumps do banco (dado real de cliente)
+*.xlsx
+*.xls
+*.xlsm
+*.ods
+*.csv
+*.sql
+*.sql.gz
+*.dump
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

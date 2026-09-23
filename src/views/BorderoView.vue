@@ -3,12 +3,14 @@ import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Plus, Trash2, Save, ArrowLeft, Printer, Calculator, 
-  AlertTriangle, CheckCircle, Wallet, Loader2, Building2 
+  AlertTriangle, CheckCircle, Wallet, Loader2, Building2, CalendarClock, X
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import operationService from '../services/operationService';
+import checkService from '../services/checkService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
 import api from '../services/api';
+import { motivoNaoUtil, proximoDiaUtil } from '../utils/diasUteis';
 
 const router = useRouter();
 
@@ -49,6 +51,11 @@ const header = reactive({
   iofDiario: 0.0041 // IOF Diário (%)
 });
 
+// Cheque nao compensa em fim de semana nem feriado. Por padrao a parcela que cai
+// nesses dias e adiada para o proximo dia util, mas da para recusar e manter a data.
+const ajustarDiaUtil = ref(true);
+const avisoDiaUtil = ref(null);
+
 const gerador = reactive({
   modo: 'valor_mao', 
   valorAlvo: 0, 
@@ -57,6 +64,39 @@ const gerador = reactive({
   intervaloTipo: 'mensal',
   diasIntervalo: 30
 });
+
+// Sugestao de emitente: o nome vem do que ja existe no banco, os mais usados
+// primeiro. E' `<datalist>` nativo - nao precisa de componente de autocomplete.
+// Motivo: nome digitado diferente do mesmo emitente foi o que deu todo o trabalho
+// na importacao da planilha (nome curto x a mesma pessoa com o nome completo).
+const emitentesSugeridos = ref([]);
+const emitenteNovo = ref(false);
+let timeoutEmitente = null;
+
+const buscarEmitentes = () => {
+  emitenteNovo.value = false;   // enquanto digita nao avisa nada
+  clearTimeout(timeoutEmitente);
+  timeoutEmitente = setTimeout(async () => {
+    try {
+      emitentesSugeridos.value = await checkService.emitentes((header.emitenteNome || '').trim());
+    } catch (e) {
+      emitentesSugeridos.value = [];
+    }
+  }, 300);
+};
+
+// O aviso de "nome novo" so aparece quando ele SAI do campo - avisar a cada tecla
+// seria chato e apareceria em todo nome pela metade.
+const conferirEmitente = async () => {
+  const termo = (header.emitenteNome || '').trim();
+  if (termo.length < 3) { emitenteNovo.value = false; return; }
+  try {
+    const achados = await checkService.emitentes(termo);
+    emitenteNovo.value = !achados.some(n => n.toLowerCase() === termo.toLowerCase());
+  } catch (e) {
+    emitenteNovo.value = false;
+  }
+};
 
 const fetchSettings = async () => {
   try {
@@ -195,6 +235,22 @@ const gerarParcelas = () => {
     datas.push(dataIso);
   }
 
+  // O ajuste de dia util entra AQUI, antes de calcular o valor da parcela: no modo
+  // Liquido o valor sai dos dias de cada data (somaDivisores logo abaixo), entao
+  // mudar a data depois faria o liquido nao bater com o valor pedido pelo cliente.
+  const ajustes = [];
+  datas.forEach((data, i) => {
+    const motivo = motivoNaoUtil(data);
+    if (!motivo) return;
+    const novaData = ajustarDiaUtil.value ? proximoDiaUtil(data) : null;
+    if (novaData) datas[i] = novaData;
+    ajustes.push({ parcela: i + 1, de: data, para: novaData, motivo });
+  });
+  avisoDiaUtil.value = ajustes.length
+    ? { ajustado: ajustarDiaUtil.value, itens: ajustes }
+    : null;
+  const ajustePorParcela = new Map(ajustes.map(a => [a.parcela, a]));
+
   let valorParcelaBruta = 0;
   if (gerador.modo === 'valor_mao') {
     let somaDivisores = 0;
@@ -220,19 +276,38 @@ const gerarParcelas = () => {
   }
 
   for (let i = 0; i < gerador.qtdParcelas; i++) {
+    const a = ajustePorParcela.get(i + 1);
     const novoItem = {
       id: Date.now() + i,
       vencimento: datas[i],
       valor: valorParcelaBruta,
-      dias: 0, juros: 0, iof: 0, liquido: 0, banco: '', num_doc: `${i + 1}/${gerador.qtdParcelas}`
+      dias: 0, juros: 0, iof: 0, liquido: 0, banco: '', num_doc: `${i + 1}/${gerador.qtdParcelas}`,
+      // de onde a data veio, quando foi adiada (a linha mostra "era 25/12 - Natal")
+      ajuste: a && a.para ? { de: a.de, motivo: a.motivo } : null
     };
     itens.value.push(novoItem);
   }
   recalcularTudo();
 };
 
-const adicionarLinha = () => { itens.value.push({ id: Date.now(), vencimento: '', valor: 0, dias: 0, juros: 0, iof: 0, liquido: 0, banco: header.bancoPadrao, num_doc: '' }); };
-const removerLinha = (index) => { itens.value.splice(index, 1); recalcularTudo(); };
+// Liga/desliga o adiamento e gera as parcelas de novo - tem que regerar porque o
+// valor da parcela depende dos dias ate o vencimento.
+const trocarAjusteDiaUtil = () => {
+  ajustarDiaUtil.value = !ajustarDiaUtil.value;
+  gerarParcelas();
+};
+
+// Data escolhida a mao manda: o aviso do gerador deixa de valer.
+const alterarVencimento = (item) => {
+  item.ajuste = null;
+  avisoDiaUtil.value = null;
+  recalcularLinha(item);
+};
+
+const dataBR = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
+
+const adicionarLinha = () => { itens.value.push({ id: Date.now(), vencimento: '', valor: 0, dias: 0, juros: 0, iof: 0, liquido: 0, banco: header.bancoPadrao, num_doc: '', ajuste: null }); };
+const removerLinha = (index) => { itens.value.splice(index, 1); avisoDiaUtil.value = null; recalcularTudo(); };
 const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
 const exportarBordero = async () => { 
@@ -375,14 +450,17 @@ const processarSalvamento = async () => {
 
           <div class="relative group">
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Emitente do Cheque</label>
-            <input type="text" v-model="header.emitenteNome" placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
+            <input type="text" v-model="header.emitenteNome" @input="buscarEmitentes" @focus="buscarEmitentes"
+                   @blur="conferirEmitente" list="emitentes-ja-usados" autocomplete="off"
+                   placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
+            <datalist id="emitentes-ja-usados">
+              <option v-for="nome in emitentesSugeridos" :key="nome" :value="nome" />
+            </datalist>
+            <p v-if="emitenteNovo" class="text-[11px] text-amber-700 font-bold mt-1 flex items-center gap-1">
+              <AlertTriangle class="w-3 h-3 shrink-0" /> Emitente novo — confira se não é um já cadastrado escrito diferente.
+            </p>
           </div>
         </div>
-
-        <div class="relative group">
-        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Emitente do Cheque</label>
-        <input type="text" v-model="header.emitenteNome" placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
-      </div>
 
       <div class="md:col-span-2 relative group mt-2">
         <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Observações do Borderô</label>
@@ -461,6 +539,43 @@ const processarSalvamento = async () => {
         </div>
       </div>
 
+      <div v-if="avisoDiaUtil" class="mb-6 rounded-xl border p-4 flex flex-col md:flex-row md:items-start gap-4"
+           :class="avisoDiaUtil.ajustado ? 'bg-amber-50 border-amber-200' : 'bg-slate-100 border-slate-300'">
+        <CalendarClock class="w-5 h-5 mt-0.5 shrink-0" :class="avisoDiaUtil.ajustado ? 'text-amber-600' : 'text-slate-500'" />
+        <div class="flex-1 text-sm">
+          <p class="font-bold" :class="avisoDiaUtil.ajustado ? 'text-amber-900' : 'text-slate-800'">
+            {{ avisoDiaUtil.itens.length === 1 ? '1 parcela caía' : avisoDiaUtil.itens.length + ' parcelas caíam' }}
+            em dia sem compensação bancária.
+            <span v-if="avisoDiaUtil.ajustado">Adiei para o próximo dia útil.</span>
+            <span v-else>Mantive as datas originais.</span>
+          </p>
+          <ul class="mt-1.5 space-y-0.5 text-xs" :class="avisoDiaUtil.ajustado ? 'text-amber-800' : 'text-slate-600'">
+            <li v-for="a in avisoDiaUtil.itens.slice(0, 4)" :key="a.parcela">
+              <strong>Parcela {{ a.parcela }}:</strong> {{ dataBR(a.de) }} ({{ a.motivo }})
+              <span v-if="a.para"> → <strong>{{ dataBR(a.para) }}</strong></span>
+            </li>
+            <li v-if="avisoDiaUtil.itens.length > 4" class="italic">
+              e mais {{ avisoDiaUtil.itens.length - 4 }}...
+            </li>
+          </ul>
+          <p class="mt-2 text-[11px]" :class="avisoDiaUtil.ajustado ? 'text-amber-700' : 'text-slate-500'">
+            Trocar gera as parcelas de novo — o valor acompanha a mudança dos dias.
+          </p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button @click="trocarAjusteDiaUtil"
+                  class="px-4 py-2 rounded-lg text-xs font-bold border transition-colors"
+                  :class="avisoDiaUtil.ajustado
+                    ? 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'
+                    : 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'">
+            {{ avisoDiaUtil.ajustado ? 'Não adiar, manter as datas' : 'Adiar para o dia útil' }}
+          </button>
+          <button @click="avisoDiaUtil = null" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60">
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
@@ -482,7 +597,15 @@ const processarSalvamento = async () => {
             <tbody class="divide-y divide-slate-100">
               <tr v-for="(item, index) in itens" :key="item.id" class="hover:bg-slate-50">
                 <td class="px-4 py-3 text-xs font-bold text-slate-400">{{ index + 1 }}</td>
-                <td class="px-4 py-3"><input type="date" v-model="item.vencimento" @change="recalcularLinha(item)" class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm outline-none focus:border-indigo-500 text-slate-600 font-medium" /></td>
+                <td class="px-4 py-3">
+                  <input type="date" v-model="item.vencimento" @change="alterarVencimento(item)" class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm outline-none focus:border-indigo-500 text-slate-600 font-medium" />
+                  <div v-if="item.ajuste" class="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-700" :title="`Adiado por: ${item.ajuste.motivo}`">
+                    <CalendarClock class="w-3 h-3 shrink-0" /> era {{ dataBR(item.ajuste.de) }} · {{ item.ajuste.motivo }}
+                  </div>
+                  <div v-else-if="motivoNaoUtil(item.vencimento)" class="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                    <AlertTriangle class="w-3 h-3 shrink-0" /> cai em {{ motivoNaoUtil(item.vencimento) }}
+                  </div>
+                </td>
                 <td class="px-4 py-3 text-center"><span class="inline-block bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded min-w-[3rem]">{{ item.dias }}</span></td>
                 <td class="px-4 py-3"><input type="number" step="0.01" v-model="item.valor" @input="recalcularLinha(item)" class="w-full text-right bg-white border border-slate-200 rounded px-2 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" /></td>
                 <td class="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30 text-sm">-{{ formatCurrency(item.juros) }}</td>

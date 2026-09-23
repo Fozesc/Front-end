@@ -22,8 +22,10 @@ export default {
         return response.data;
     },
 
-    delete: async (id) => {
-        const response = await api.delete(`/transactions/${id}`);
+    // apagar lancamento muda o saldo na hora e nao tem desfazer: o backend exige
+    // a senha de quem esta logado (mesmo 2o fator da edicao de cheque)
+    delete: async (id, senha) => {
+        const response = await api.delete(`/transactions/${id}`, { data: { senha } });
         return response.data;
     },
     saveInitialBalances: async (data) => {

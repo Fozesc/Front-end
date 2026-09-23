@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { X, CalendarClock, Save, AlertTriangle, Wallet, Loader2 } from 'lucide-vue-next';
 import checkService from '../../../services/checkService'; 
 import settingsService from '../../../services/settingsService';
+import { motivoNaoUtil, proximoDiaUtil } from '../../../utils/diasUteis';
 
 const props = defineProps({
   cheque: Object,
@@ -30,6 +31,37 @@ onMounted(async () => {
     console.error("Erro ao carregar taxa de prorrogação:", e);
   }
 });
+
+// Cheque nao compensa em fim de semana nem feriado: a data escolhida e' adiada para
+// o proximo dia util, e ele pode recusar. O juros da prorrogacao recalcula sozinho
+// pelo watch de diasExtras - a formula nao foi tocada.
+const ajusteData = ref(null);
+let ignorarProximo = false;
+
+watch(() => form.value.new_date, (nova) => {
+  if (ignorarProximo) { ignorarProximo = false; return; }
+  if (!nova) { ajusteData.value = null; return; }
+  const motivo = motivoNaoUtil(nova);
+  if (!motivo) { ajusteData.value = null; return; }
+  const util = proximoDiaUtil(nova);
+  ajusteData.value = { de: nova, para: util, motivo, mantida: false };
+  ignorarProximo = true;
+  form.value.new_date = util;
+});
+
+const manterDataOriginal = () => {
+  ignorarProximo = true;
+  form.value.new_date = ajusteData.value.de;
+  ajusteData.value = { ...ajusteData.value, mantida: true };
+};
+
+const adiarNovamente = () => {
+  ignorarProximo = true;
+  form.value.new_date = ajusteData.value.para;
+  ajusteData.value = { ...ajusteData.value, mantida: false };
+};
+
+const dataBR = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
 
 const diasExtras = computed(() => {
   if (!form.value.new_date || !props.cheque) return 0;
@@ -101,6 +133,29 @@ const salvar = async () => {
           <input type="date" v-model="form.new_date" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700">
           <div v-if="diasExtras > 0" class="text-xs text-emerald-600 font-bold mt-1">
             + {{ diasExtras }} dias (Taxa: {{ taxaProrrogacaoBase }}% a.m.)
+          </div>
+
+          <div v-if="ajusteData" class="mt-2 rounded-lg border p-2.5 text-xs"
+               :class="ajusteData.mantida ? 'bg-slate-100 border-slate-300' : 'bg-amber-50 border-amber-200'">
+            <div class="flex items-start gap-2">
+              <CalendarClock class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                             :class="ajusteData.mantida ? 'text-slate-500' : 'text-amber-600'" />
+              <div class="flex-1">
+                <p :class="ajusteData.mantida ? 'text-slate-700' : 'text-amber-900'">
+                  <strong>{{ dataBR(ajusteData.de) }}</strong> cai em {{ ajusteData.motivo }}.
+                  <span v-if="!ajusteData.mantida">Adiei para <strong>{{ dataBR(ajusteData.para) }}</strong>.</span>
+                  <span v-else>Mantida como você escolheu.</span>
+                </p>
+                <button v-if="!ajusteData.mantida" @click="manterDataOriginal"
+                        class="mt-1 font-bold text-amber-800 underline hover:text-amber-900">
+                  Não adiar, manter {{ dataBR(ajusteData.de) }}
+                </button>
+                <button v-else @click="adiarNovamente"
+                        class="mt-1 font-bold text-slate-700 underline hover:text-slate-900">
+                  Adiar para {{ dataBR(ajusteData.para) }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
