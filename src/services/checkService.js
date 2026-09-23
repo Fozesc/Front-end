@@ -5,6 +5,10 @@ export default {
 
     return api.get('/checks/', { params }).then(res => res.data);
   },
+  // nomes de emitente ja usados (os mais frequentes primeiro)
+  emitentes(q) {
+    return api.get('/checks/emitentes', { params: { q, limit: 10 } }).then(res => res.data);
+  },
   getPortfolioTotal() {
     return api.get('/checks/portfolio-total').then(res => res.data);
   },

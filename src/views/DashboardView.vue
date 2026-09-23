@@ -3,18 +3,19 @@ import { ref, onMounted, computed, watch } from 'vue';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import RelatorioModal from '../components/layout/RelatorioModal.vue';
 import { 
-  Wallet, TrendingUp, AlertTriangle, Calendar, FileText, Users, DollarSign, Activity, Download
+  Wallet, TrendingUp, AlertTriangle, Calendar, FileText, Users, DollarSign, Activity, Download,
+  CalendarClock, X
 } from 'lucide-vue-next';
 
 import {
   Chart as ChartJS,
-  Title, Tooltip, Legend, 
+  Title, Tooltip, Legend, BarElement,
   PointElement, LineElement, CategoryScale, LinearScale, ArcElement, Filler
 } from 'chart.js';
-import { Line, Doughnut } from 'vue-chartjs';
+import { Bar, Doughnut } from 'vue-chartjs';
 import api from '../services/api';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler);
 
 
 const loading = ref(true);
@@ -25,6 +26,22 @@ const chartType = ref('lucro');
 const kpis = ref({ capital: 0, lucro: 0, inadimplencia: 0, carteira: 0 });
 const proximosVencimentos = ref([]);
 const chartDataPie = ref([0, 0, 0, 0, 0]); 
+
+// Aviso de vencimento: SO do dia de hoje, e some quando ele fecha. De proposito nao
+// acumula os dias anteriores - aviso que cresce sozinho vira paisagem e ninguem le.
+const vencemHoje = ref({ data: '', quantidade: 0, total: 0 });
+const avisoDispensado = ref(false);
+
+const CHAVE_AVISO = 'fozesc_aviso_vencimento';
+
+const mostrarAvisoHoje = computed(() =>
+  !avisoDispensado.value && vencemHoje.value.quantidade > 0
+);
+
+const dispensarAviso = () => {
+  avisoDispensado.value = true;
+  try { localStorage.setItem(CHAVE_AVISO, vencemHoje.value.data); } catch (e) { /* aba anonima */ }
+};
 const chartEvolution = ref({ labels: [], profit_data: [], cash_data: [] }); 
 
 
@@ -38,6 +55,12 @@ const fetchDashboard = async () => {
     const { data } = await api.get(`/dashboard?period=${chartPeriod.value}`);
     kpis.value = data.kpis;
     proximosVencimentos.value = data.upcoming;
+    vencemHoje.value = data.vencem_hoje || { data: '', quantidade: 0, total: 0 };
+    try {
+      avisoDispensado.value = localStorage.getItem(CHAVE_AVISO) === vencemHoje.value.data;
+    } catch (e) {
+      avisoDispensado.value = false;
+    }
     chartDataPie.value = data.charts.pie_chart; 
    
     chartEvolution.value = {
@@ -56,13 +79,33 @@ watch(chartPeriod, () => { fetchDashboard(); });
 onMounted(() => { fetchDashboard(); });
 
 
+const STATUS_CARTEIRA = [
+  { nome: 'A Receber', cor: '#6366f1' },
+  { nome: 'Recebido', cor: '#10b981' },
+  { nome: 'Atrasado', cor: '#ef4444' },
+  { nome: 'Devolvido', cor: '#f97316' },
+  { nome: 'Jurídico', cor: '#a855f7' },
+];
+
+// Só o que tem valor. Antes a legenda listava as 5 situações mesmo com R$ 0,00,
+// e o buraco da rosca ficava vazio no lugar onde cabe o total.
+const fatiasCarteira = computed(() =>
+  STATUS_CARTEIRA
+    .map((s, i) => ({ ...s, valor: Number(chartDataPie.value[i] || 0) }))
+    .filter(s => s.valor > 0)
+);
+
+const totalCarteira = computed(() => fatiasCarteira.value.reduce((t, s) => t + s.valor, 0));
+
+const pct = (v) => (totalCarteira.value > 0 ? Math.round((v / totalCarteira.value) * 100) : 0);
+
 const chartDataDoughnut = computed(() => ({
-  labels: ['A Receber', 'Recebido', 'Atrasado', 'Devolvido', 'Jurídico'],
+  labels: fatiasCarteira.value.map(s => s.nome),
   datasets: [{
-    backgroundColor: ['#6366f1', '#10b981', '#ef4444', '#f97316', '#a855f7'], 
-    data: chartDataPie.value,
+    backgroundColor: fatiasCarteira.value.map(s => s.cor),
+    data: fatiasCarteira.value.map(s => s.valor),
     borderWidth: 0,
-    hoverOffset: 15
+    hoverOffset: 12
   }]
 }));
 
@@ -70,11 +113,7 @@ const chartOptionsDoughnut = {
   responsive: true, 
   maintainAspectRatio: false,
   plugins: { 
-    legend: { 
-        display: true,
-        position: 'bottom',
-        labels: { usePointStyle: true, font: { size: 10 } }
-    },
+    legend: { display: false },
     tooltip: {
       callbacks: {
         label: function(context) {
@@ -93,43 +132,72 @@ const chartOptionsDoughnut = {
 };
 
 
-const chartDataLine = computed(() => {
-  const isLucro = chartType.value === 'lucro';
-  const dataValues = isLucro ? chartEvolution.value.profit_data : chartEvolution.value.cash_data;
-  const labels = chartEvolution.value.labels;
-  const color = isLucro ? '#10b981' : '#3b82f6';
-  const labelText = isLucro ? 'Lucro (Juros)' : 'Saldo Líquido';
+const temDados = computed(() => chartEvolution.value.labels.length > 0);
 
-  return {
-    labels: labels,
-    datasets: [
-      {
-        label: labelText,
-        backgroundColor: (context) => {
-          const ctx = context.chart.ctx;
-          const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-          gradient.addColorStop(0, isLucro ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)');
-          gradient.addColorStop(1, isLucro ? 'rgba(16, 185, 129, 0.0)' : 'rgba(59, 130, 246, 0.0)');
-          return gradient;
-        },
-        borderColor: color,
-        borderWidth: 3,
-        pointBackgroundColor: '#fff',
-        pointBorderColor: color,
-        pointRadius: 4,
-        fill: true,
-        tension: 0.4,
-        data: dataValues
-      }
-    ]
-  };
+// O que o gráfico do caixa mostra é a MOVIMENTAÇÃO do período (entradas - saídas),
+// não o saldo acumulado. O rótulo antigo dizia "Saldo Líquido" e enganava: um mês
+// sem movimento aparecia como saldo zero. Por isso virou barra, com o mês negativo
+// em vermelho abaixo da linha do zero.
+const serieLucro = () => ({
+  type: 'line',
+  label: 'Lucro (juros gerado)',
+  data: chartEvolution.value.profit_data,
+  borderColor: '#10b981',
+  backgroundColor: (context) => {
+    const ctx = context.chart.ctx;
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    return gradient;
+  },
+  borderWidth: 3,
+  pointBackgroundColor: '#fff',
+  pointBorderColor: '#10b981',
+  pointRadius: 3,
+  fill: chartType.value === 'lucro',
+  tension: 0.4,
+  order: 0,
 });
+
+const serieCaixa = () => ({
+  type: 'bar',
+  label: 'Movimento do caixa',
+  data: chartEvolution.value.cash_data,
+  backgroundColor: chartEvolution.value.cash_data.map(v => (v < 0 ? '#fca5a5' : '#93c5fd')),
+  borderColor: chartEvolution.value.cash_data.map(v => (v < 0 ? '#ef4444' : '#3b82f6')),
+  borderWidth: 1,
+  borderRadius: 4,
+  order: 1,
+});
+
+const chartDataLine = computed(() => {
+  const datasets = [];
+  if (chartType.value !== 'caixa') datasets.push(serieLucro());
+  if (chartType.value !== 'lucro') datasets.push(serieCaixa());
+  return { labels: chartEvolution.value.labels, datasets };
+});
+
+// Total do período: o número que o gráfico desenha, escrito por extenso.
+const totalPeriodo = computed(() => {
+  const soma = (a) => (a || []).reduce((t, v) => t + Number(v || 0), 0);
+  if (chartType.value === 'lucro') return soma(chartEvolution.value.profit_data);
+  if (chartType.value === 'caixa') return soma(chartEvolution.value.cash_data);
+  return soma(chartEvolution.value.profit_data);
+});
+
+const rotuloTotal = computed(() =>
+  chartType.value === 'caixa' ? 'Movimento no período' : 'Juros gerado no período'
+);
 
 const chartOptionsLine = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: { 
-      legend: { display: false },
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } }
+      },
       tooltip: {
           mode: 'index',
           intersect: false,
@@ -143,7 +211,7 @@ const chartOptionsLine = {
   },
   scales: {
     y: { 
-      beginAtZero: true, 
+      beginAtZero: false, 
       grid: { color: '#f1f5f9' }, 
       ticks: { 
           font: { size: 10 }, 
@@ -177,6 +245,24 @@ const chartOptionsLine = {
           <Calendar class="w-4 h-4 mr-2 text-indigo-500" /> {{ new Date().toLocaleDateString('pt-BR') }}
         </div>
       </div>
+    </div>
+
+    <div v-if="mostrarAvisoHoje" class="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
+      <div class="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0"><CalendarClock class="w-5 h-5" /></div>
+      <div class="flex-1">
+        <p class="font-bold text-amber-900 text-sm">
+          {{ vencemHoje.quantidade === 1 ? '1 cheque vence hoje' : vencemHoje.quantidade + ' cheques vencem hoje' }}
+          · {{ formatMoney(vencemHoje.total) }}
+        </p>
+        <p class="text-xs text-amber-700 mt-0.5">Só os de hoje. O que já venceu antes continua na tela de Títulos.</p>
+      </div>
+      <router-link to="/cheques" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shrink-0">
+        Ver títulos
+      </router-link>
+      <button @click="dispensarAviso" title="Não mostrar de novo hoje"
+              class="p-2 text-amber-500 hover:text-amber-800 hover:bg-amber-100 rounded-lg shrink-0">
+        <X class="w-4 h-4" />
+      </button>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -224,13 +310,22 @@ const chartOptionsLine = {
       
       <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div class="flex bg-slate-100 p-1 rounded-xl">
-            <button @click="chartType = 'lucro'" class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2" :class="chartType === 'lucro' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'">
-              <TrendingUp class="w-3 h-3" /> Lucro (Juros)
-            </button>
-            <button @click="chartType = 'caixa'" class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2" :class="chartType === 'caixa' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'">
-              <Activity class="w-3 h-3" /> Saldo Caixa
-            </button>
+          <div>
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+              <button @click="chartType = 'lucro'" class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2" :class="chartType === 'lucro' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'">
+                <TrendingUp class="w-3 h-3" /> Lucro (Juros)
+              </button>
+              <button @click="chartType = 'caixa'" class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2" :class="chartType === 'caixa' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'">
+                <Activity class="w-3 h-3" /> Caixa
+              </button>
+              <button @click="chartType = 'ambos'" class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-2" :class="chartType === 'ambos' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'">
+                <Activity class="w-3 h-3" /> Os dois
+              </button>
+            </div>
+            <div v-if="chartType !== 'ambos'" class="mt-2 ml-1">
+              <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">{{ rotuloTotal }}</span>
+              <div class="text-xl font-bold" :class="totalPeriodo < 0 ? 'text-red-600' : 'text-slate-800'">{{ formatMoney(totalPeriodo) }}</div>
+            </div>
           </div>
           <div class="flex bg-slate-100 p-1 rounded-lg">
             <button @click="chartPeriod = 'dias'" class="px-3 py-1 text-xs font-bold rounded-md transition-all" :class="chartPeriod === 'dias' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'">Dias</button>
@@ -238,8 +333,12 @@ const chartOptionsLine = {
             <button @click="chartPeriod = 'meses'" class="px-3 py-1 text-xs font-bold rounded-md transition-all" :class="chartPeriod === 'meses' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'">12 Meses</button>
           </div>
         </div>
-        <div class="flex-1 min-h-[250px]">
-          <Line :data="chartDataLine" :options="chartOptionsLine" />
+        <div class="flex-1 min-h-[250px] relative">
+          <Bar v-if="temDados" :data="chartDataLine" :options="chartOptionsLine" />
+          <div v-else class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm">
+            <Activity class="w-8 h-8 mb-2 opacity-40" />
+            Nenhum movimento neste período.
+          </div>
         </div>
       </div>
 
@@ -247,11 +346,22 @@ const chartOptionsLine = {
         <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><Users class="w-5 h-5 text-indigo-500" /> Status da Carteira</h3>
         
         <div class="flex-1 flex items-center justify-center relative min-h-[180px]">
-           <Doughnut :data="chartDataDoughnut" :options="chartOptionsDoughnut" />
+          <Doughnut v-if="totalCarteira > 0" :data="chartDataDoughnut" :options="chartOptionsDoughnut" />
+          <div v-if="totalCarteira > 0" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total</span>
+            <span class="text-lg font-bold text-slate-800">{{ formatMoney(totalCarteira) }}</span>
+          </div>
+          <div v-else class="text-slate-400 text-sm">Nenhum título na carteira.</div>
         </div>
 
-        <div class="mt-4 text-center text-xs text-slate-400">
-            * Passe o mouse para ver porcentagem e valores
+        <div v-if="totalCarteira > 0" class="mt-4 space-y-1.5">
+          <div v-for="s in fatiasCarteira" :key="s.nome" class="flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-600 font-medium">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: s.cor }"></span>
+              {{ s.nome }}
+            </span>
+            <span class="font-bold text-slate-800">{{ formatMoney(s.valor) }} <span class="text-slate-400 font-medium">({{ pct(s.valor) }}%)</span></span>
+          </div>
         </div>
       </div>
     </div>

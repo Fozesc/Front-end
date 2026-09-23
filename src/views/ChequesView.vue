@@ -6,13 +6,15 @@ import ChequeForm from '../components/layout/finance/ChequeForm.vue';
 import EditarChequeModal from '../components/layout/finance/EditarChequeModal.vue';
 import ChequeDetalhesModal from '../components/layout/finance/ChequeDetalhesModal.vue';
 import ProrrogacaoModal from '../components/layout/finance/ProrrogacaoModal.vue'; 
+import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
 import api from '../services/api';
 
 import { 
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock, AlertTriangle, Archive, RotateCcw, Pencil
+  Edit, Download, CalendarClock, AlertTriangle, Archive, RotateCcw, Pencil,
+  HandCoins
 } from 'lucide-vue-next';
 
 import checkService from '../services/checkService';
@@ -28,6 +30,9 @@ const showProrrogacaoModal = ref(false);
 const chequeParaProrrogar = ref(null);
 const chequeParaEditar = ref(null);
 const showEditModal = ref(false);
+// Cheque em recebimento. O modal proprio existe porque a baixa pode ser DIVIDIDA
+// (parte no dinheiro, parte no banco) - nao cabe no confirm generico.
+const chequeParaReceber = ref(null);
 
 // Cheques marcados na tela para a acao em lote (tirar/devolver ao calculo).
 const selecionados = ref([]);
@@ -187,9 +192,18 @@ const salvarCheque = async (dadosFormulario) => {
   }
 };
 
+const abrirRecebimento = (cheque) => {
+  closeGlobalMenus();
+  if (cheque.status === 'Pago') return;
+  chequeParaReceber.value = cheque;
+};
+
 const alterarStatus = (cheque, novoStatus) => {
   closeGlobalMenus();
   if (cheque.status === novoStatus) return;
+
+  // receber tem tela propria (uma conta ou dividido em partes)
+  if (novoStatus === 'Pago') { abrirRecebimento(cheque); return; }
 
   let title = `Alterar Status`;
   let msg = `Tem certeza que deseja mudar o status para "${novoStatus}"?`;
@@ -197,12 +211,7 @@ const alterarStatus = (cheque, novoStatus) => {
   let requiresAccount = false;
   let payloadData = {};
 
-  if (novoStatus === 'Pago') {
-    title = 'Confirmar Recebimento';
-    msg = `O valor de ${formatCurrency(cheque.valor_bruto)} entrará no caixa.`;
-    alertType = 'success';
-    requiresAccount = true;
-  } else if (novoStatus === 'Devolvido') {
+  if (novoStatus === 'Devolvido') {
     title = 'Confirmar Devolução';
     const valorMultaCalculada = cheque.valor_bruto * (taxaMulta.value / 100);
     msg = `A multa de ${formatCurrency(valorMultaCalculada)} entrará no caixa escolhido.`;
@@ -225,7 +234,7 @@ const alterarStatus = (cheque, novoStatus) => {
       
       carregarDados();
     } catch (error) { 
-      alert("Erro ao atualizar o status."); 
+      alert(error.response?.data?.error || "Erro ao atualizar o status."); 
     }
   }, alertType, requiresAccount);
 };
@@ -333,6 +342,8 @@ const exportarTela = () => {
                        @close="showEditModal = false"
                        @saved="() => { showEditModal = false; carregarDados(); }" />
     <ProrrogacaoModal v-if="showProrrogacaoModal" :cheque="chequeParaProrrogar" :isOpen="showProrrogacaoModal" @close="showProrrogacaoModal = false" @save="() => { showProrrogacaoModal = false; carregarDados(); }" />
+    <RecebimentoModal v-if="chequeParaReceber" :cheque="chequeParaReceber"
+                      @close="chequeParaReceber = null" @confirmado="carregarDados" />
 
     <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
@@ -487,6 +498,9 @@ const exportarTela = () => {
                 </td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end gap-1">
+                    <button v-if="cheque.status !== 'Pago'" @click.stop="abrirRecebimento(cheque)"
+                            title="Receber (uma conta ou dividido)"
+                            class="p-2 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><HandCoins class="w-4 h-4"/></button>
                     <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-2 text-slate-300 hover:text-amber-600 transition-colors"><Pencil class="w-4 h-4"/></button>
                     <button @click.stop="abrirProrrogacao(cheque)" class="p-2 text-slate-300 hover:text-indigo-600 transition-colors"><CalendarClock class="w-4 h-4"/></button>
                     <button @click.stop="deletarCheque(cheque.id)" class="p-2 text-slate-300 hover:text-red-600 transition-colors"><Trash2 class="w-4 h-4"/></button>

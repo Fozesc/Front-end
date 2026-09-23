@@ -1,15 +1,13 @@
 <script setup>
-import { ref, onMounted, reactive, watch, nextTick, computed } from 'vue';
+import { ref, onMounted, reactive, watch, computed } from 'vue';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import NovoLancamentoModal from '../components/FluxoCaixa/NovoLancamentoModal.vue';
 import ConfiguracaoModal from '../components/FluxoCaixa/ConfiguracaoModal.vue';
 import DetalhesLancamentoModal from '../components/FluxoCaixa/DetalhesLancamentoModal.vue';
 
 import { 
-  Wallet, Building, Banknote, Plus, Download, Search, 
-  Trash2, Edit2, Settings, Filter, ArrowUpCircle, ArrowDownCircle, 
-  ChevronDown, Loader2, ArrowLeft, ArrowRight, Eye, TrendingUp,
-  AlertTriangle 
+  Building, Banknote, Plus, Trash2, Edit2, Settings, ArrowDownCircle,
+  Loader2, TrendingUp, AlertTriangle, Link2
 } from 'lucide-vue-next';
 
 import transactionService from '../services/transactionService';
@@ -17,7 +15,6 @@ import transactionService from '../services/transactionService';
 const showModal = ref(false);
 const showConfigModal = ref(false);
 const loading = ref(true);
-const isPrinting = ref(false);
 
 const lancamentoEmEdicao = ref(null);
 const lancamentoParaDetalhes = ref(null);
@@ -38,12 +35,13 @@ const capitalTotal = ref(0);
 
 const filtros = reactive({ texto: '', data: '', tipo: 'todos' });
 
-// Controle do Modal de Alerta
+// Exclusao de lancamento: exige a senha de quem esta logado (o backend confere).
 const confirmModal = reactive({
   visible: false,
-  id: null,
-  title: 'Excluir Lançamento',
-  message: 'Tem certeza que deseja apagar este registro? Esta ação não pode ser desfeita.'
+  item: null,
+  senha: '',
+  erro: '',
+  salvando: false
 });
 
 // CÁLCULOS
@@ -100,25 +98,88 @@ const salvarLancamento = async (dados) => {
   } catch (error) { alert("Erro ao salvar."); }
 };
 
-const excluirLancamento = (id) => {
-  confirmModal.id = id;
+const excluirLancamento = (item) => {
+  confirmModal.item = item;
+  confirmModal.senha = '';
+  confirmModal.erro = '';
   confirmModal.visible = true;
 };
 
+// De onde a linha veio. Apagar uma baixa de cheque tira o dinheiro do caixa mas
+// deixa o cheque como Pago - por isso o aviso aparece antes de confirmar.
+const vinculoDoLancamento = computed(() => {
+  const i = confirmModal.item;
+  if (!i) return '';
+  if (i.check_id) return 'Esta linha é a baixa de um cheque. Apagar tira o dinheiro do caixa, mas o cheque continua marcado como Pago.';
+  if (i.operation_id) return 'Esta linha é o dinheiro emprestado em um borderô. Apagar tira a saída do caixa, mas o borderô continua lá.';
+  return '';
+});
+
 const confirmarExclusao = async () => {
-  const id = confirmModal.id;
-  confirmModal.visible = false;
-  try { 
-    await transactionService.delete(id); 
-    await carregarTabela(); 
-    await carregarSaldos(); 
-  } catch (error) { 
-    alert("Erro ao excluir."); 
+  if (!confirmModal.senha) { confirmModal.erro = 'Digite sua senha para confirmar.'; return; }
+  confirmModal.salvando = true;
+  confirmModal.erro = '';
+  try {
+    await transactionService.delete(confirmModal.item.id, confirmModal.senha);
+    confirmModal.visible = false;
+    confirmModal.senha = '';
+    await carregarTabela();
+    await carregarSaldos();
+  } catch (error) {
+    confirmModal.erro = error.response?.data?.error || 'Não foi possível apagar o lançamento.';
+  } finally {
+    confirmModal.salvando = false;
   }
 };
 
 const formatMoney = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
+const formatPct = (p) => `${p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)}%`;
+
+// Recebimento dividido: o backend grava uma linha por parte e marca o rotulo
+// "(Parte 1/2 · PIX)" na descricao. Aqui a linha vira: descricao limpa + etiqueta,
+// e as partes do mesmo cheque (check_id) aparecem grudadas como um bloco.
+const RX_PARTE = /\s*\(Parte (\d+)\/(\d+)(?: · ([^)]+))?\)\s*$/;
+
+const linhas = computed(() => {
+  const porCheque = {};
+  for (const l of lancamentos.value) {
+    if (l.check_id) (porCheque[l.check_id] ||= []).push(l);
+  }
+
+  const linhasFinais = lancamentos.value.map((l) => {
+    const info = RX_PARTE.exec(l.descricao || '');
+    if (!info) return { ...l, descricaoLimpa: l.descricao, parte: 0 };
+
+    const grupo = porCheque[l.check_id] || [];
+    const completo = grupo.length === Number(info[2]);
+    const totalCheque = completo ? grupo.reduce((t, x) => t + Math.abs(x.valor || 0), 0) : 0;
+
+    return {
+      ...l,
+      descricaoLimpa: (l.descricao || '').replace(RX_PARTE, ''),
+      parte: Number(info[1]),
+      partes: Number(info[2]),
+      forma: info[3] || '',
+      totalCheque,
+      pct: totalCheque ? (Math.abs(l.valor || 0) / totalCheque) * 100 : 0,
+      primeiraDoGrupo: completo && Number(info[1]) === 1
+    };
+  });
+
+  // a lista vem do mais novo para o mais velho (id desc), o que colocava a parte 2
+  // acima da parte 1. Dentro do bloco do mesmo cheque, inverte para ler 1, 2, 3...
+  for (const grupo of Object.values(porCheque)) {
+    if (grupo.length < 2) continue;
+    const posicoes = grupo
+      .map(l => linhasFinais.findIndex(x => x.id === l.id))
+      .sort((a, b) => a - b);
+    const ordenadas = posicoes.map(i => linhasFinais[i]).sort((a, b) => a.parte - b.parte);
+    posicoes.forEach((pos, i) => { linhasFinais[pos] = ordenadas[i]; });
+  }
+
+  return linhasFinais;
+});
 </script>
 
 <template>
@@ -129,19 +190,47 @@ const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 
     <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 p-6 text-center animate-scale-in">
-        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 text-red-600 mb-6">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 p-6 animate-scale-in">
+        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 text-red-600 mb-5">
           <AlertTriangle class="h-8 w-8" />
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ confirmModal.title }}</h3>
-        <p class="text-slate-500 mb-8 text-sm leading-relaxed">{{ confirmModal.message }}</p>
-        
-        <div class="flex gap-3">
+        <h3 class="text-xl font-bold text-slate-900 mb-2 text-center">Apagar lançamento do caixa</h3>
+        <p class="text-slate-500 mb-4 text-sm leading-relaxed text-center">
+          O saldo muda na hora e <strong class="text-slate-700">não há como desfazer</strong>.
+        </p>
+
+        <div v-if="confirmModal.item" class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 text-sm">
+          <div class="font-bold text-slate-800">{{ confirmModal.item.descricao }}</div>
+          <div class="flex justify-between mt-1 text-slate-500 text-xs">
+            <span>{{ formatDate(confirmModal.item.data) }} · {{ confirmModal.item.origem }}</span>
+            <span class="font-bold" :class="confirmModal.item.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-600'">
+              {{ confirmModal.item.tipo === 'entrada' ? '+' : '-' }} {{ formatMoney(confirmModal.item.valor) }}
+            </span>
+          </div>
+        </div>
+
+        <p v-if="vinculoDoLancamento" class="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          <AlertTriangle class="w-4 h-4 mt-0.5 shrink-0" /> {{ vinculoDoLancamento }}
+        </p>
+
+        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sua senha</label>
+        <input
+          v-model="confirmModal.senha"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Digite sua senha para confirmar"
+          class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 text-sm mb-2"
+          @keyup.enter="confirmarExclusao"
+        />
+        <p v-if="confirmModal.erro" class="text-xs text-red-600 font-bold mb-2">{{ confirmModal.erro }}</p>
+
+        <div class="flex gap-3 mt-4">
           <button @click="confirmModal.visible = false" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm">
             Cancelar
           </button>
-          <button @click="confirmarExclusao" class="flex-1 px-4 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200 text-sm">
-            Sim, Apagar
+          <button @click="confirmarExclusao" :disabled="confirmModal.salvando"
+                  class="flex-1 px-4 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 disabled:opacity-60 transition-colors shadow-lg shadow-red-200 text-sm">
+            {{ confirmModal.salvando ? 'Apagando...' : 'Sim, apagar' }}
           </button>
         </div>
       </div>
@@ -221,9 +310,29 @@ const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr v-if="loading"><td colspan="6" class="px-6 py-10 text-center"><Loader2 class="w-6 h-6 animate-spin mx-auto"/></td></tr>
-            <tr v-for="item in lancamentos" :key="item.id" class="hover:bg-slate-50 transition-colors">
-              <td class="px-6 py-4 text-slate-500 font-mono text-xs">{{ formatDate(item.data) }}</td>
-              <td class="px-6 py-4 font-medium text-slate-800">{{ item.descricao }}</td>
+            <tr v-for="item in linhas" :key="item.id"
+                class="hover:bg-slate-50 transition-colors"
+                :class="item.parte ? 'bg-indigo-50/40' : ''">
+              <td class="px-6 py-4 text-slate-500 font-mono text-xs"
+                  :class="item.parte ? 'border-l-[3px] border-indigo-400' : ''">
+                {{ item.parte && !item.primeiraDoGrupo ? '' : formatDate(item.data) }}
+              </td>
+              <td class="px-6 py-4 font-medium text-slate-800">
+                <div class="flex items-center gap-2">
+                  <Link2 v-if="item.parte" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"
+                         title="Parte de um recebimento dividido (mesmo cheque)" />
+                  <span>{{ item.descricaoLimpa }}</span>
+                </div>
+                <div v-if="item.parte" class="mt-1 flex items-center gap-2 text-[10px] font-bold">
+                  <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase tracking-tight">
+                    Parte {{ item.parte }}/{{ item.partes }}
+                  </span>
+                  <span v-if="item.forma && item.forma !== item.origem" class="text-slate-500 uppercase">{{ item.forma }}</span>
+                  <span v-if="item.pct" class="text-slate-400">
+                    {{ formatPct(item.pct) }} do cheque{{ item.totalCheque ? ' de ' + formatMoney(item.totalCheque) : '' }}
+                  </span>
+                </div>
+              </td>
               <td class="px-6 py-4">
                 <span class="px-3 py-1 rounded text-[10px] font-bold border uppercase tracking-tighter whitespace-nowrap"
                   :class="{
@@ -239,12 +348,28 @@ const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2 opacity-40 hover:opacity-100 transition-opacity">
                   <button @click="abrirModalEdicao(item)" class="p-1 hover:text-indigo-600"><Edit2 class="w-4 h-4"/></button>
-                  <button @click="excluirLancamento(item.id)" class="p-1 hover:text-red-600"><Trash2 class="w-4 h-4"/></button>
+                  <button @click="excluirLancamento(item)" class="p-1 hover:text-red-600"><Trash2 class="w-4 h-4"/></button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+        <span class="text-xs text-slate-500 font-bold">
+          Página {{ currentPage }} de {{ totalPages || 1 }} · {{ totalItems }} lançamento(s)
+        </span>
+        <div class="flex gap-2">
+          <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1"
+                  class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
+            Anterior
+          </button>
+          <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage >= totalPages"
+                  class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
+            Próxima
+          </button>
+        </div>
       </div>
     </div>
   </DashboardLayout>

@@ -59,15 +59,15 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="flex h-screen bg-slate-50 overflow-hidden">
+  <div class="flex h-screen bg-slate-50 overflow-hidden font-sans">
     
     <aside 
-      class="hidden md:flex flex-col bg-slate-900 text-white transition-all duration-300 ease-in-out fixed h-full z-50 border-r border-slate-800"
+      class="hidden md:flex flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white transition-all duration-300 ease-in-out fixed h-full z-50 border-r border-slate-800/80"
       :class="isSidebarCollapsed ? 'w-20' : 'w-64'"
     >
       <div class="h-16 flex items-center px-4 border-b border-slate-800 transition-all" :class="isSidebarCollapsed ? 'justify-center' : 'justify-between'">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-lg flex-shrink-0">
+          <div class="bg-gradient-to-br from-indigo-500 to-indigo-700 p-2 rounded-xl text-white shadow-lg shadow-indigo-900/40 flex-shrink-0">
             <Wallet class="w-6 h-6" />
           </div>
           
@@ -83,12 +83,15 @@ const handleLogout = async () => {
           v-for="item in navigation" 
           :key="item.name" 
           :to="item.path"
-          class="flex items-center px-3 py-3 rounded-lg transition-all group relative"
+          class="flex items-center px-3 py-3 rounded-xl transition-all group relative"
           :class="route.path === item.path 
-            ? 'bg-indigo-600 text-white shadow-md' 
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' 
+            : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'"
           :title="isSidebarCollapsed ? item.name : ''"
         >
+          <span v-if="route.path === item.path"
+                class="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-white/80"></span>
+
           <component 
             :is="item.icon" 
             class="w-5 h-5 transition-transform group-hover:scale-110 flex-shrink-0" 
@@ -175,13 +178,14 @@ const handleLogout = async () => {
       class="flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out"
       :class="isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'"
     >
-      <div class="md:hidden absolute top-2 left-2 z-10">
-        <button @click="toggleMobileSidebar" class="p-2 rounded-md text-slate-500 hover:text-slate-900 bg-white shadow-sm border border-slate-200">
-          <Menu class="h-6 w-6" />
+      <div class="md:hidden absolute top-3 left-3 z-20">
+        <button @click="toggleMobileSidebar" aria-label="Abrir menu"
+                class="p-2 rounded-xl text-slate-600 hover:text-slate-900 bg-white/90 backdrop-blur shadow-sm border border-slate-200">
+          <Menu class="h-5 w-5" />
         </button>
       </div>
 
-      <main class="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8">
+      <main class="flex-1 overflow-y-auto app-bg p-4 md:p-8 pt-14 md:pt-8">
         <div class="max-w-7xl mx-auto pb-20">
           <slot></slot>
         </div>
