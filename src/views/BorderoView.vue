@@ -311,8 +311,13 @@ const processarSalvamento = async () => {
       iof_amount: totais.value.iof,
       total_net: totais.value.liquido, // valor realmente emprestado (o que sai do caixa) = face - juros - IOF
       notes: header.observacao,
+      // o servidor grava exatamente estes centavos (depois de conferir com a mesma conta)
+      iof_enabled: header.iofEnabled,
+      iof_base: header.iofBase,
+      iof_diario: header.iofDiario,
       checks: itens.value.map(item => ({
         valor: item.valor, vencimento: item.vencimento,
+        juros: item.juros, iof: item.iof, liquido: item.liquido,
         banco: item.banco || '', num_doc: item.num_doc || '', emitente: header.emitenteNome
       }))
     };
