@@ -15,6 +15,10 @@ export default {
   updateStatus(id, status, paymentData = null) {
     return api.patch(`/checks/${id}/status`, { status, ...paymentData }).then(res => res.data);
   },
+  // titulo com o borderô de origem, os outros titulos dele e o historico (tela de detalhes)
+  detalhes(id) {
+    return api.get(`/checks/${id}`).then(res => res.data);
+  },
   prorrogate(id, payload) {
     return api.post(`/checks/${id}/prorrogate`, payload).then(res => res.data);
   },

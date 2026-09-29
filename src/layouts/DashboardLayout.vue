@@ -2,6 +2,7 @@
 import api from '../services/api';
 import { ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { VERSAO } from '../versao';
 import { 
   LayoutDashboard, 
   Banknote, 
@@ -132,6 +133,8 @@ const handleLogout = async () => {
             <LogOut class="w-5 h-5 flex-shrink-0" :class="!isSidebarCollapsed ? 'mr-3' : ''" />
             <span v-show="!isSidebarCollapsed" class="text-sm font-bold">Sair</span>
           </button>
+          <p class="mt-2 text-[10px] text-slate-600 tabular-nums select-none" :class="isSidebarCollapsed ? 'text-center' : 'px-3'"
+             title="Versão do sistema">{{ isSidebarCollapsed ? 'v' + VERSAO : 'Versão ' + VERSAO }}</p>
         </div>
       </div>
     </aside>
@@ -170,6 +173,7 @@ const handleLogout = async () => {
               Sair do Sistema
             </button>
           </nav>
+          <p class="px-4 mt-6 text-[10px] text-slate-600 tabular-nums">Versão {{ VERSAO }}</p>
         </div>
       </div>
     </div>

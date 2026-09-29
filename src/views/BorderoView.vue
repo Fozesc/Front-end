@@ -11,6 +11,10 @@ import checkService from '../services/checkService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
 import api from '../services/api';
 import { motivoNaoUtil, proximoDiaUtil } from '../utils/diasUteis';
+import {
+  arredondar, calcularDias, calcularLinha, divisorInverso, iofDasConfiguracoes,
+  IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
+} from '../utils/calculoBordero';
 
 const router = useRouter();
 
@@ -41,14 +45,14 @@ const header = reactive({
   emitenteNome: '',
   dataOperacao: new Date().toISOString().split('T')[0],
   taxaMensal: 4.00,
-  diasCompensacao: 2,
+  diasCompensacao: DIAS_COMPENSACAO_PADRAO,
   bancoPadrao: '', 
   contaSaida: 'Dinheiro',
   observacao: '',
   // --- CAMPOS IOF ---
   iofEnabled: true,
-  iofBase: 0.38,   // IOF Adicional Fixo (%)
-  iofDiario: 0.0041 // IOF Diário (%)
+  iofBase: IOF_BASE_PADRAO,   // IOF Adicional Fixo (%)
+  iofDiario: IOF_DIARIO_PADRAO // IOF Diário (%)
 });
 
 // Cheque nao compensa em fim de semana nem feriado. Por padrao a parcela que cai
@@ -102,13 +106,9 @@ const fetchSettings = async () => {
   try {
     const { data } = await api.get('/settings/');
     if (data) {
-      // Procura pelo nome exato que está no seu banco de dados
-      const taxaBase = data.iof_base || data.iof_rate || data.iof_base_rate || 0.38;
-      header.iofBase = Number(taxaBase);
-      
-      // Se houver IOF diário no banco, ele pega. Se não, usa o padrão 0.0041
-      const taxaDiaria = data.iof_daily || data.iof_daily_rate || 0.0041;
-      header.iofDiario = Number(taxaDiaria);
+      const { iofBase, iofDiario } = iofDasConfiguracoes(data);
+      header.iofBase = iofBase;
+      header.iofDiario = iofDiario;
     }
   } catch (error) {
     console.error("Usando IOF padrão (Fixo: 0.38% / Diário: 0.0041%)");
@@ -164,47 +164,15 @@ const totais = computed(() => {
   }, { bruto: 0, juros: 0, iof: 0, liquido: 0 });
 });
 
-const arredondar = (valor) => Math.round((valor + Number.EPSILON) * 100) / 100;
-
-const getDataLimpa = (dataStr) => {
-  if (!dataStr) return null;
-  const [ano, mes, dia] = dataStr.split('-').map(Number);
-  return new Date(Date.UTC(ano, mes - 1, dia, 12, 0, 0));
-};
-
-const calcularDias = (dataBase, dataVencimento, diasComp) => {
-  if (!dataBase || !dataVencimento) return 0;
-  const d1 = getDataLimpa(dataBase);
-  const d2 = getDataLimpa(dataVencimento);
-  const diffTime = d2.getTime() - d1.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays + Number(diasComp);
-};
-
 const recalcularLinha = (item) => {
   item.dias = calcularDias(header.dataOperacao, item.vencimento, header.diasCompensacao);
-  if (!item.valor || item.dias <= 0) { 
-    item.juros = 0; item.iof = 0; item.liquido = Number(item.valor) || 0; return; 
-  }
-  
-  const valorFace = Number(item.valor);
-  const taxaDecimal = Number(header.taxaMensal) / 100;
-  const totalMes = item.dias / 30.0;
-  
-  const fator = Math.pow(1 + taxaDecimal, totalMes);
-  const jurosCalculado = valorFace * (fator - 1);
-  
-  // --- NOVA REGRA DO IOF OFICIAL ---
-  let iofCalculado = 0;
-  if (header.iofEnabled) {
-    const calcBase = valorFace * (header.iofBase / 100);
-    const calcDiario = valorFace * (header.iofDiario / 100) * item.dias;
-    iofCalculado = calcBase + calcDiario;
-  }
-  
-  item.juros = arredondar(jurosCalculado);
-  item.iof = arredondar(iofCalculado);
-  item.liquido = arredondar(valorFace - item.juros - item.iof);
+  const { juros, iof, liquido } = calcularLinha({
+    valor: item.valor, dias: item.dias, taxaMensal: header.taxaMensal,
+    iofEnabled: header.iofEnabled, iofBase: header.iofBase, iofDiario: header.iofDiario
+  });
+  item.juros = juros;
+  item.iof = iof;
+  item.liquido = liquido;
 };
 
 const recalcularTudo = () => { itens.value.forEach(recalcularLinha); };
@@ -254,19 +222,12 @@ const gerarParcelas = () => {
   let valorParcelaBruta = 0;
   if (gerador.modo === 'valor_mao') {
     let somaDivisores = 0;
-    const taxaDecimal = Number(header.taxaMensal) / 100;
-    const iofBaseDecimal = header.iofEnabled ? (header.iofBase / 100) : 0;
-    const iofDiarioDecimal = header.iofEnabled ? (header.iofDiario / 100) : 0;
-
     datas.forEach(dataVenc => {
       const dias = calcularDias(header.dataOperacao, dataVenc, header.diasCompensacao);
-      const tempoMeses = dias / 30.0;
-      const fator = Math.pow(1 + taxaDecimal, tempoMeses);
-      
-      // Matemática Inversa Completa
-      const iofCompleto = iofBaseDecimal + (iofDiarioDecimal * dias);
-      const divisor = 2 - fator - iofCompleto; 
-      somaDivisores += divisor;
+      somaDivisores += divisorInverso({
+        dias, taxaMensal: header.taxaMensal,
+        iofEnabled: header.iofEnabled, iofBase: header.iofBase, iofDiario: header.iofDiario
+      });
     });
     valorParcelaBruta = gerador.valorAlvo / somaDivisores;
     valorParcelaBruta = arredondar(valorParcelaBruta);
