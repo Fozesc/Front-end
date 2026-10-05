@@ -1,37 +1,50 @@
 @import "tailwindcss";
 
 /* Tokens do tema (Tailwind v4). Mexer aqui muda o visual de TODAS as telas de uma
-   vez, sem tocar no HTML de cada uma: sombra mais macia e a fonte do sistema. */
+   vez, sem tocar no HTML de cada uma. Visual empresarial moderno: cantos medios
+   (nem quadrado, nem bolha - rounded-full continua redondo) e sombras suaves em
+   camadas, que dao profundidade sem pesar. */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
-  --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 4px 12px -2px rgb(15 23 42 / 0.08);
-  --shadow-lg: 0 4px 6px -2px rgb(15 23 42 / 0.05), 0 12px 24px -6px rgb(15 23 42 / 0.12);
-  --shadow-xl: 0 8px 12px -4px rgb(15 23 42 / 0.06), 0 20px 40px -8px rgb(15 23 42 / 0.16);
-  --shadow-2xl: 0 24px 60px -12px rgb(15 23 42 / 0.28);
+  --radius: 0.375rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.125rem;
+
+  --shadow-2xs: 0 1px 0 0 rgb(16 24 40 / 0.03);
+  --shadow-xs: 0 1px 2px 0 rgb(16 24 40 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(16 24 40 / 0.06), 0 1px 2px -1px rgb(16 24 40 / 0.04);
+  --shadow: 0 1px 3px 0 rgb(16 24 40 / 0.08), 0 1px 2px -1px rgb(16 24 40 / 0.06);
+  --shadow-md: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 2px 4px -2px rgb(16 24 40 / 0.05);
+  --shadow-lg: 0 12px 16px -4px rgb(16 24 40 / 0.08), 0 4px 6px -2px rgb(16 24 40 / 0.03);
+  --shadow-xl: 0 20px 24px -4px rgb(16 24 40 / 0.10), 0 8px 8px -4px rgb(16 24 40 / 0.04);
+  --shadow-2xl: 0 24px 48px -12px rgb(16 24 40 / 0.22);
 }
 
 :root {
   font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-optical-sizing: auto;
   line-height: 1.5;
   font-weight: 400;
+  color: #0f172a;
   /* numero com largura fixa: as colunas de valor do sistema ficam alinhadas
      (R$ 1.111,00 e R$ 9.999,00 ocupam a mesma largura) */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.006em;
 }
 
-/* Removemos cores fixas daqui para deixar o Tailwind controlar no Layout */
 body {
   margin: 0;
   padding: 0;
   min-width: 100vw;
   min-height: 100vh;
-  /* Garante transição suave ao trocar de tema */
-  transition: background-color 0.3s ease, color 0.3s ease;
+  background: #f6f7f9;
 }
 
 #app {
@@ -42,12 +55,24 @@ body {
   height: 100%;
 }
 
-/* Fundo das telas: cinza com um brilho sutil no topo, so para nao ser chapado */
+/* Fundo das telas: cinza bem claro e frio, os cards brancos se destacam pela sombra */
 .app-bg {
-  background:
-    radial-gradient(1100px 380px at 15% -12%, rgb(224 231 255 / 0.55), transparent 65%),
-    radial-gradient(900px 320px at 95% -8%, rgb(209 250 229 / 0.45), transparent 60%),
-    #f8fafc;
+  background: #f6f7f9;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.018em;
+}
+
+/* Tailwind 4 pinta borda sem cor com a cor do texto (preta). As telas foram escritas
+   esperando o cinza claro do Tailwind 3 - este e' o ajuste oficial de compatibilidade. */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-slate-200, currentColor);
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 ::selection {
@@ -59,20 +84,23 @@ body {
 :where(button, a, [role="button"]):focus-visible {
   outline: 2px solid rgb(99 102 241);
   outline-offset: 2px;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
 }
 
 /* Scrollbar personalizada e sutil */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  background-color: rgb(148 163 184 / 0.45);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-600;
+  background-color: rgb(100 116 139 / 0.6);
 }

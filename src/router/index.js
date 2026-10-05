@@ -11,6 +11,7 @@ import FluxoCaixaView from '../views/FluxoCaixaView.vue'
 import ConfiguracoesView from '../views/ConfiguracoesView.vue'
 import AuditView from '../views/AuditView.vue'
 import HistoricoView from '../views/HistoricoView.vue'
+import ValesView from '../views/ValesView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -72,6 +73,12 @@ const router = createRouter({
       path: '/historico',
       name: 'historico',
       component: HistoricoView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/vales',
+      name: 'vales',
+      component: ValesView,
       meta: { requiresAuth: true }
     }
   ]

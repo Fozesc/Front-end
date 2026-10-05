@@ -20,19 +20,19 @@ export const ESTILO = {
   Dinheiro: {
     barra: 'bg-emerald-500',
     chip: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    ativo: 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm',
+    ativo: 'border-emerald-500 bg-emerald-50/60 text-emerald-700 ring-1 ring-emerald-500',
     ponto: 'bg-emerald-500'
   },
   BB: {
     barra: 'bg-blue-500',
     chip: 'bg-blue-50 text-blue-700 border-blue-200',
-    ativo: 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm',
+    ativo: 'border-blue-500 bg-blue-50/60 text-blue-700 ring-1 ring-blue-500',
     ponto: 'bg-blue-500'
   },
   Caixa: {
     barra: 'bg-sky-500',
     chip: 'bg-sky-50 text-sky-700 border-sky-200',
-    ativo: 'border-sky-500 bg-sky-50 text-sky-700 shadow-sm',
+    ativo: 'border-sky-500 bg-sky-50/60 text-sky-700 ring-1 ring-sky-500',
     ponto: 'bg-sky-500'
   }
 };

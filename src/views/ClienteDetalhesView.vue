@@ -203,13 +203,13 @@ const formatDate = (iso) => {
 };
 
 const getStatusColor = (s, isAtrasado) => {
-  if (s === 'Juridico') return 'bg-purple-100 text-purple-700 border-purple-200';
+  if (s === 'Juridico') return 'bg-purple-50 text-purple-700 border-purple-200';
   
-  if (isAtrasado) return 'bg-red-100 text-red-700 border-red-200';
+  if (isAtrasado) return 'bg-red-50 text-red-700 border-red-200';
   
   switch(s) {
-    case 'Pago': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    case 'Devolvido': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'Pago': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    case 'Devolvido': return 'bg-orange-50 text-orange-700 border-orange-200';
     default: return 'bg-blue-50 text-blue-700 border-blue-200';
   }
 };
@@ -226,28 +226,28 @@ const exportarFicha = () => {
       
       <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-3">
-          <button @click="router.back()" class="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
-            <ArrowLeft class="w-6 h-6" />
+          <button @click="router.back()" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 shadow-xs hover:bg-slate-50 rounded-lg text-slate-500 transition-colors">
+            <ArrowLeft class="w-[18px] h-[18px]" />
           </button>
           <div>
-            <h1 class="text-2xl font-bold text-slate-900">{{ cliente.nome }}</h1>
-            <p class="text-slate-500 text-sm">Ficha Cadastral e Operacional</p>
+            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">{{ cliente.nome }}</h1>
+            <p class="text-slate-500 text-sm mt-0.5">Ficha cadastral e operacional</p>
           </div>
         </div>
-        <button @click="exportarFicha" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-bold shadow-sm flex items-center transition-colors">
-          <Printer class="w-4 h-4 mr-2" /> Imprimir Ficha
+        <button @click="exportarFicha" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+          <Printer class="w-4 h-4 mr-2 text-slate-500" /> Imprimir ficha
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex items-center gap-2 mb-4 text-indigo-600 font-bold uppercase text-xs tracking-wide">
-            <FileText class="w-4 h-4" /> Dados Cadastrais
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center gap-2.5 mb-4 text-sm font-semibold text-slate-900">
+            <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><FileText class="w-4 h-4" /></span> Dados cadastrais
           </div>
           <div class="space-y-2 text-sm">
-            <div class="flex justify-between"><span class="text-slate-500">Documento</span> <span class="font-mono text-slate-900">{{ cliente.documento }}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Documento</span> <span class="font-medium text-slate-900 tabular-nums">{{ cliente.documento }}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">Telefone</span> <span class="text-slate-900">{{ cliente.telefone }}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">Taxa</span> <span class="font-bold text-blue-600">{{ cliente.taxa }}%</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Taxa</span> <span class="font-semibold text-indigo-600">{{ cliente.taxa }}%</span></div>
             
             <div class="pt-2 mt-2 border-t border-slate-100">
               <div class="text-slate-500 text-xs mb-1 flex items-center gap-1"><MapPin class="w-3 h-3"/> Endereço</div>
@@ -255,18 +255,18 @@ const exportarFicha = () => {
             </div>
             
             <div class="pt-2 mt-2 border-t border-slate-100">
-              <div class="text-slate-500 text-xs mb-1 font-bold">Observações</div>
+              <div class="text-slate-500 text-xs mb-1">Observações</div>
               <div class="text-slate-800 leading-tight text-xs italic">{{ cliente.obs || '-' }}</div>
             </div>
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex items-center gap-2 mb-4 text-emerald-600 font-bold uppercase text-xs tracking-wide">
-            <CreditCard class="w-4 h-4" /> Limite e Crédito
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center gap-2.5 mb-4 text-sm font-semibold text-slate-900">
+            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100 flex items-center justify-center"><CreditCard class="w-4 h-4" /></span> Limite e crédito
           </div>
           <div class="mb-2">
-            <span class="text-2xl font-bold text-slate-900">{{ formatMoney(cliente.limite) }}</span>
+            <span class="text-2xl font-semibold tracking-tight text-slate-900">{{ formatMoney(cliente.limite) }}</span>
             <span class="text-xs text-slate-400 ml-2">Limite</span>
           </div>
           <div class="w-full bg-slate-100 h-2.5 rounded-full mb-3 overflow-hidden">
@@ -275,49 +275,48 @@ const exportarFicha = () => {
                  :style="{ width: cliente.limite > 0 ? Math.min((totalEmAbertoGlobal / cliente.limite) * 100, 100) + '%' : '0%' }">
             </div>
           </div>
-          <div class="flex justify-between text-xs font-bold border-t border-slate-50 pt-2">
+          <div class="flex justify-between text-xs font-medium border-t border-slate-100 pt-2.5">
             <span class="text-slate-500">Utilizado: {{ formatMoney(totalEmAbertoGlobal) }}</span>
             <span class="text-emerald-600">Disp: {{ formatMoney(cliente.limite - totalEmAbertoGlobal) }}</span>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex items-center gap-2 mb-4 text-red-600 font-bold uppercase text-xs tracking-wide">
-            <AlertTriangle class="w-4 h-4" /> Pendências
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
+          <div class="flex items-center gap-2.5 mb-4 text-sm font-semibold text-slate-900">
+            <span class="w-8 h-8 rounded-lg bg-red-50 text-red-600 ring-1 ring-inset ring-red-100 flex items-center justify-center"><AlertTriangle class="w-4 h-4" /></span> Pendências
           </div>
-          <div v-if="totalDevolvido > 0" class="p-3 bg-red-50 rounded-lg border border-red-100 text-center animate-pulse">
-            <div class="text-red-600 font-bold text-xl">{{ formatMoney(totalDevolvido) }}</div>
-            <div class="text-xs text-red-400">Em Devolvidos</div>
+          <div v-if="totalDevolvido > 0" class="p-3 bg-red-50 rounded-lg border border-red-100 text-center">
+            <div class="text-red-600 font-semibold tracking-tight text-xl">{{ formatMoney(totalDevolvido) }}</div>
+            <div class="text-xs text-red-500">em devolvidos</div>
           </div>
-          <div v-else class="text-emerald-600 font-bold mb-3 flex items-center gap-2">
+          <div v-else class="text-emerald-700 text-sm font-medium bg-emerald-50 border border-emerald-100 rounded-lg p-3 flex items-center gap-2">
             <CheckCircle class="w-5 h-5" /> Nenhuma pendência
           </div>
         </div>
       </div>
 
       <div class="space-y-4">
-        <h3 class="font-bold text-slate-700 text-lg">Histórico de Operações</h3>
+        <h3 class="font-semibold text-slate-900 text-base">Histórico de operações</h3>
 
         <div v-if="loading" class="text-center py-10 text-slate-400 flex flex-col items-center">
           <Loader2 class="w-8 h-8 animate-spin mb-2 text-indigo-500" />
           Carregando dados...
         </div>
 
-        <div v-else-if="operacoesDoCliente.length === 0" class="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+        <div v-else-if="operacoesDoCliente.length === 0" class="text-center py-10 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 text-sm">
           Nenhuma operação registrada para este cliente.
         </div>
 
-        <div v-for="op in operacoesDoCliente" :key="op.id" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible transition-all duration-300">
+        <div v-for="op in operacoesDoCliente" :key="op.id" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-visible transition-all duration-300">
           
-          <div @click="toggleOp(op.id)" class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors border-l-4" 
-               :class="op.statusGeral === 'Concluída' ? 'border-emerald-500' : (op.temAtraso ? 'border-red-500' : 'border-indigo-500')">
+          <div @click="toggleOp(op.id)" class="px-5 py-4 flex items-center justify-between cursor-pointer rounded-xl hover:bg-slate-50/70 transition-colors">
             
             <div class="flex items-center gap-4">
-              <div class="p-2 rounded-lg" :class="op.statusGeral === 'Concluída' ? 'bg-emerald-100 text-emerald-600' : (op.temAtraso ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600')">
+              <div class="p-2 rounded-lg" :class="op.statusGeral === 'Concluída' ? 'bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100' : (op.temAtraso ? 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-100' : 'bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100')">
                 <FileText class="w-5 h-5" />
               </div>
               <div>
-                <h4 class="font-bold text-slate-800">Operação #{{ op.id }}</h4>
+                <h4 class="font-semibold text-slate-900">Operação #{{ op.id }}</h4>
                 <div class="text-xs text-slate-500 flex gap-2">
                   <span class="flex items-center gap-1"><Clock class="w-3 h-3" /> {{ formatDate(op.data) }}</span>
                   <span>•</span>
@@ -328,16 +327,16 @@ const exportarFicha = () => {
 
             <div class="flex items-center gap-4">
               <div class="text-right mr-2">
-                <div class="text-xs text-slate-400 uppercase font-bold">Total Op.</div>
-                <div class="font-bold text-slate-900">{{ formatMoney(op.total) }}</div>
+                <div class="text-xs text-slate-500">Total da operação</div>
+                <div class="font-semibold text-slate-900 tabular-nums">{{ formatMoney(op.total) }}</div>
               </div>
               
-              <div v-if="op.temAtraso && op.statusGeral !== 'Concluída'" class="px-3 py-1 rounded-full text-xs font-bold border bg-red-100 text-red-700 border-red-200 flex items-center gap-1 animate-pulse">
+              <div v-if="op.temAtraso && op.statusGeral !== 'Concluída'" class="px-2 py-0.5 rounded-md text-xs font-medium border bg-red-50 text-red-700 border-red-200 flex items-center gap-1">
                 <AlertTriangle class="w-3 h-3" /> Atraso
               </div>
 
-              <div class="px-3 py-1 rounded-full text-xs font-bold border" 
-                   :class="op.statusGeral === 'Concluída' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'">
+              <div class="px-2 py-0.5 rounded-md text-xs font-medium border" 
+                   :class="op.statusGeral === 'Concluída' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'">
                 {{ op.statusGeral }}
               </div>
 
@@ -348,9 +347,9 @@ const exportarFicha = () => {
             </div>
           </div>
 
-          <div v-if="expandedOps.includes(op.id)" class="border-t border-slate-100 bg-slate-50/50 p-4 animate-fade-in-down">
-            <table class="w-full text-left text-sm bg-white rounded-lg shadow-sm overflow-visible border border-slate-200">
-              <thead class="bg-slate-100 text-slate-500 uppercase text-xs">
+          <div v-if="expandedOps.includes(op.id)" class="border-t border-slate-100 bg-slate-50/60 p-4 animate-fade-in-down">
+            <table class="w-full text-left text-sm bg-white rounded-lg shadow-xs overflow-visible border border-slate-200">
+              <thead class="bg-slate-50 text-slate-500 text-xs font-medium border-b border-slate-200">
                 <tr>
                   <th class="px-4 py-2">Vencimento</th>
                   <th class="px-4 py-2">Banco / Doc</th>
@@ -361,26 +360,26 @@ const exportarFicha = () => {
               </thead>
               <tbody class="divide-y divide-slate-100">
                 <tr v-for="cheque in op.cheques" :key="cheque.id" class="hover:bg-slate-50 transition-colors">
-                  <td class="px-4 py-3 font-mono" :class="cheque.isAtrasado ? 'text-red-600 font-bold' : 'text-slate-600'">
+                  <td class="px-4 py-3 tabular-nums" :class="cheque.isAtrasado ? 'text-red-600 font-semibold' : 'text-slate-600'">
                     {{ formatDate(cheque.vencimento) }}
                     <span v-if="cheque.isAtrasado" class="text-[10px] ml-1">(!)</span>
                   </td>
                   <td class="px-4 py-3 text-slate-600">{{ cheque.banco }} - {{ cheque.num_doc }}</td>
                   <td class="px-4 py-3 text-slate-900 font-medium">{{ cheque.emitente }}</td>
-                  <td class="px-4 py-3 text-right font-bold text-slate-800">{{ formatMoney(cheque.valor) }}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-slate-900 tabular-nums">{{ formatMoney(cheque.valor) }}</td>
                   
                   <td class="px-4 py-3 text-center relative">
                     <button 
                       @click="toggleStatusMenu(cheque.id, $event)"
-                      :class="['px-2 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1 mx-auto transition-all w-fit', getStatusColor(cheque.status, cheque.isAtrasado)]"
+                      :class="['pl-2 pr-1.5 py-0.5 rounded-md text-xs font-medium border flex items-center gap-1.5 mx-auto transition-all w-fit before:w-1.5 before:h-1.5 before:rounded-full before:bg-current before:opacity-80', getStatusColor(cheque.status, cheque.isAtrasado)]"
                     >
                       {{ cheque.isAtrasado ? 'Atrasado' : cheque.status }} <ChevronDown class="w-3 h-3 opacity-50" />
                     </button>
 
-                    <div v-if="openStatusMenuId === cheque.id" class="absolute right-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden text-left animate-scale-in">
+                    <div v-if="openStatusMenuId === cheque.id" class="absolute right-0 mt-1.5 w-36 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden text-left animate-scale-in p-1">
                       <div v-for="opt in statusOptions" :key="opt" 
                            @click.stop="alterarStatus(cheque, opt, op)"
-                           class="px-3 py-2 text-xs font-bold hover:bg-slate-50 cursor-pointer text-slate-600 hover:text-indigo-600 flex justify-between items-center border-b border-slate-50 last:border-0">
+                           class="px-2.5 py-1.5 text-[13px] font-medium rounded-md hover:bg-slate-100 cursor-pointer text-slate-700 flex justify-between items-center">
                         {{ opt }}
                         <Check v-if="cheque.status === opt" class="w-3 h-3 text-emerald-500" />
                       </div>

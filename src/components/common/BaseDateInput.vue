@@ -121,7 +121,7 @@ watch(() => props.modelValue, (newVal) => {
       :value="displayValue"
       @input="handleInput"
       placeholder="DD/MM/AAAA"
-      class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 font-medium text-slate-700 transition-all placeholder:text-slate-300"
+      class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 shadow-xs"
       inputmode="numeric" 
       maxlength="10"
     />

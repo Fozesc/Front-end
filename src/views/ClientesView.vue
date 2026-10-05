@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Plus, Search, Printer, Edit2, 
-  AlertTriangle, AlertCircle, X, Loader2,
+  AlertTriangle, X, Loader2,
   ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone, Merge
 } from 'lucide-vue-next';
 import clientService from '../services/clientService';
@@ -157,67 +157,70 @@ const aoMesclar = async (r) => {
 };
 
 const exportarLista = async () => { isPrinting.value = true; await nextTick(); window.print(); isPrinting.value = false; };
+
+// a marca que o import da planilha grava nas observacoes vira etiqueta, nao texto
+const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pela importacao da planilha historica)?\s*/, '').trim();
 </script>
 
 <template>
   <DashboardLayout>
     <div class="print:hidden">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Carteira de Clientes</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Clientes</h1>
           <div class="flex items-center gap-2 mt-1">
-            <span class="text-slate-500 text-sm">Total: <strong>{{ totalItems }}</strong> clientes</span>
-            <span v-if="loading" class="text-xs text-indigo-500 font-bold ml-2 flex items-center">
+            <span class="text-slate-500 text-sm">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> clientes</span>
+            <span v-if="loading" class="text-xs text-indigo-600 font-medium ml-2 flex items-center">
               <Loader2 class="w-3 h-3 mr-1 animate-spin" /> Buscando...
             </span>
           </div>
         </div>
-        <div class="flex gap-3">
-          <button @click="exportarLista" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-lg font-bold shadow-sm flex items-center transition-all">
-            <Printer class="w-5 h-5 mr-2" /> Exportar
+        <div class="flex gap-2.5">
+          <button @click="exportarLista" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+            <Printer class="w-4 h-4 mr-2 text-slate-500" /> Exportar
           </button>
-          <button @click="abrirModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md shadow-indigo-200 flex items-center transition-all">
-            <Plus class="w-5 h-5 mr-2" /> Novo Cliente
+          <button @click="abrirModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-colors">
+            <Plus class="w-4 h-4 mr-2" /> Novo cliente
           </button>
         </div>
       </div>
 
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex gap-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 mb-4 flex gap-3">
         <div class="relative flex-1">
-          <Search class="w-5 h-5 absolute left-3 top-2.5 text-slate-400" />
+          <Search class="w-[18px] h-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             v-model="filters.search" 
             type="text" 
             placeholder="Buscar por nome, documento ou telefone..." 
-            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+            class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs"
           />
         </div>
-        <button @click="resetFilters" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg" title="Limpar">
-          <RotateCcw class="w-5 h-5" />
+        <button @click="resetFilters" class="w-10 flex items-center justify-center bg-white border border-slate-300 shadow-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors" title="Limpar">
+          <RotateCcw class="w-4 h-4" />
         </button>
       </div>
 
-      <div v-if="avisoMerge" class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm font-semibold flex items-center">
+      <div v-if="avisoMerge" class="mb-4 bg-emerald-50 border border-emerald-200/80 text-emerald-800 rounded-xl px-4 py-3 text-sm font-medium flex items-center shadow-xs">
         <Merge class="w-4 h-4 mr-2 shrink-0" /> {{ avisoMerge }}
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col min-h-[400px]">
         <div class="overflow-x-auto">
-          <table class="w-full text-left whitespace-nowrap">
-            <thead class="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Cliente / Obs</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase">CPF / CNPJ</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Telefone</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase text-center">Taxa</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Limite Crédito</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase text-center">Cheques</th>
-                <th class="px-6 py-3 text-xs font-bold text-slate-500 uppercase text-right">Ações</th>
+          <table class="w-full text-left text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200">
+              <tr class="text-xs font-medium text-slate-500">
+                <th class="px-3 py-2.5">Cliente</th>
+                <th class="px-3 py-2.5 whitespace-nowrap">CPF / CNPJ</th>
+                <th class="px-3 py-2.5">Telefone</th>
+                <th class="px-3 py-2.5 text-right">Taxa</th>
+                <th class="px-3 py-2.5 text-right whitespace-nowrap">Em aberto / Limite</th>
+                <th class="px-3 py-2.5 text-center">Títulos</th>
+                <th class="px-3 py-2.5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-if="clientes.length === 0 && !loading">
-                <td colspan="7" class="px-6 py-8 text-center text-slate-500">Nenhum cliente encontrado.</td>
+                <td colspan="7" class="px-3 py-8 text-center text-slate-500">Nenhum cliente encontrado.</td>
               </tr>
               <tr 
                 v-for="cliente in clientes" 
@@ -225,60 +228,42 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
                 class="group hover:bg-slate-50 transition-colors cursor-pointer"
                 @click="abrirDetalhes(cliente.id)"
               >
-                <td class="px-6 py-4">
-                  <div class="flex items-start">
-                    <div class="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg mr-3 flex-shrink-0">
-                      {{ cliente.name ? cliente.name.charAt(0).toUpperCase() : '?' }}
-                    </div>
-                    
-                    <div class="min-w-0">
-                      <div class="font-bold text-slate-900 flex items-center gap-2">
-                        <span class="truncate max-w-[180px] lg:max-w-[280px]" :title="cliente.name">
-                          {{ cliente.name }}
-                        </span>
-                        
-                        <span v-if="cliente.pendencia" class="flex-shrink-0 flex items-center gap-1 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full uppercase font-bold tracking-wide animate-pulse">
-                          <AlertTriangle class="w-3 h-3" /> Limite
-                        </span>
-                      </div>
-                      
-                      <div v-if="cliente.notes" class="mt-1 inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 max-w-full truncate" :title="cliente.notes">
-                        <AlertCircle class="w-3 h-3 flex-shrink-0" /> {{ cliente.notes }}
-                      </div>
-                    </div>
+                <td class="px-3 py-2.5">
+                  <div class="font-semibold text-slate-900 flex items-center gap-2 min-w-0 max-w-[250px] 2xl:max-w-[360px]">
+                    <span class="truncate min-w-0" :title="cliente.name">{{ cliente.name }}</span>
+                    <span v-if="(cliente.notes || '').includes('[IMPORT-PLANILHA]')" class="flex-shrink-0 px-1.5 py-px rounded-md border border-slate-200 text-slate-500 text-[11px] font-medium">importado</span>
+                    <span v-if="cliente.pendencia" class="flex-shrink-0 inline-flex items-center gap-1 text-[11px] border border-red-200 bg-red-50 text-red-700 px-1.5 py-px rounded-md font-medium">
+                      <AlertTriangle class="w-3 h-3" /> acima do limite
+                    </span>
                   </div>
+                  <div v-if="notasVisiveis(cliente.notes)" class="text-xs text-slate-500 truncate max-w-[250px] 2xl:max-w-[360px]" :title="notasVisiveis(cliente.notes)">{{ notasVisiveis(cliente.notes) }}</div>
                 </td>
 
-                <td class="px-6 py-4 text-sm text-slate-600 font-mono">{{ cliente.document || '-' }}</td>
-                <td class="px-6 py-4 text-sm text-slate-600">{{ maskPhone(cliente.phone) || '-' }}</td>
-                
-                <td class="px-6 py-4 text-center">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700">{{ (cliente.standard_rate || 4.0).toFixed(2) }}%</span>
-                </td>
+                <td class="px-3 py-2.5 text-slate-600 tabular-nums whitespace-nowrap">{{ cliente.document || '—' }}</td>
+                <td class="px-3 py-2.5 text-slate-600 tabular-nums whitespace-nowrap">{{ maskPhone(cliente.phone) || '—' }}</td>
+                <td class="px-3 py-2.5 text-right text-slate-700 tabular-nums whitespace-nowrap">{{ (cliente.standard_rate || 4.0).toFixed(2).replace('.', ',') }}%</td>
 
-                <td class="px-6 py-4">
-                  <div class="w-32">
-                    <div class="flex justify-between text-xs mb-1">
-                      <span class="font-bold text-slate-700">{{ formatMoney(cliente.valor_em_aberto) }}</span>
+                <td class="px-3 py-2.5">
+                  <div class="w-44 ml-auto">
+                    <div class="flex justify-between gap-2 text-xs tabular-nums whitespace-nowrap">
+                      <span class="font-semibold" :class="cliente.pendencia ? 'text-red-700' : 'text-slate-800'">{{ formatMoney(cliente.valor_em_aberto) }}</span>
                       <span class="text-slate-400">{{ formatMoney(cliente.credit_limit) }}</span>
                     </div>
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div class="mt-1.5 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                       <div class="h-1.5 rounded-full" :class="getLimitColor(cliente.valor_em_aberto, cliente.credit_limit)" :style="{ width: cliente.credit_limit > 0 ? Math.min((cliente.valor_em_aberto / cliente.credit_limit) * 100, 100) + '%' : '0%' }"></div>
                     </div>
                   </div>
                 </td>
 
-                <td class="px-6 py-4 text-center">
-                  <div class="text-sm font-bold text-slate-700">
-                    <span class="text-emerald-600">{{ cliente.cheques_ativos }}</span> 
-                    <span class="text-slate-300">/</span> {{ cliente.cheques_totais }}
-                  </div>
+                <td class="px-3 py-2.5 text-center tabular-nums whitespace-nowrap" title="em aberto / total">
+                  <span class="font-semibold text-slate-800">{{ cliente.cheques_ativos }}</span>
+                  <span class="text-slate-400"> / {{ cliente.cheques_totais }}</span>
                 </td>
 
-                <td class="px-6 py-4 text-right">
-                  <div class="flex justify-end gap-2">
-                    <button @click.stop="abrirModal(cliente.id)" title="Editar cadastro" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 class="w-4 h-4" /></button>
-                    <button @click.stop="clienteParaMesclar = cliente" title="Juntar com outro cadastro do mesmo cliente" class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"><Merge class="w-4 h-4" /></button>
+                <td class="px-3 py-1.5 text-right">
+                  <div class="flex justify-end gap-1">
+                    <button @click.stop="abrirModal(cliente.id)" title="Editar cadastro" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"><Edit2 class="w-4 h-4" /></button>
+                    <button @click.stop="clienteParaMesclar = cliente" title="Juntar com outro cadastro do mesmo cliente" class="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"><Merge class="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -286,11 +271,11 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
           </table>
         </div>
 
-        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
-          <span class="text-xs text-slate-500 font-bold">Página {{ currentPage }} de {{ totalPages }}</span>
+        <div class="px-5 py-3 border-t border-slate-200 flex justify-between items-center">
+          <span class="text-[13px] text-slate-500">Página <span class="font-semibold text-slate-700">{{ currentPage }}</span> de <span class="font-semibold text-slate-700">{{ totalPages }}</span></span>
           <div class="flex gap-2">
-            <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-100 disabled:opacity-50"><ArrowLeft class="w-4 h-4" /></button>
-            <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage === totalPages" class="px-3 py-1 bg-white border border-slate-300 rounded text-slate-600 hover:bg-slate-100 disabled:opacity-50"><ArrowRight class="w-4 h-4" /></button>
+            <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1" class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none"><ArrowLeft class="w-4 h-4" /></button>
+            <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage === totalPages" class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none"><ArrowRight class="w-4 h-4" /></button>
           </div>
         </div>
       </div>
@@ -299,19 +284,19 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showModal = false"></div>
       
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl relative z-10 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl relative z-10 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
         
-        <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
-          <div class="flex items-center gap-2">
-            <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+        <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 flex items-center justify-center bg-indigo-50 ring-1 ring-inset ring-indigo-100 rounded-lg text-indigo-600">
               <User class="w-5 h-5" />
             </div>
             <div>
-              <h3 class="font-bold text-lg text-slate-800 leading-tight">{{ form.id ? 'Editar Cliente' : 'Novo Cliente' }}</h3>
-              <p class="text-xs text-slate-500">Preencha os dados do cadastro</p>
+              <h3 class="font-semibold text-base text-slate-900 leading-tight">{{ form.id ? 'Editar Cliente' : 'Novo Cliente' }}</h3>
+              <p class="text-sm text-slate-500">Preencha os dados do cadastro</p>
             </div>
           </div>
-          <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-2 rounded-full transition-colors">
+          <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
             <X class="w-5 h-5" />
           </button>
         </div>
@@ -319,89 +304,89 @@ const exportarLista = async () => { isPrinting.value = true; await nextTick(); w
         <div class="p-6 space-y-5 overflow-y-auto">
           
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Nome Completo</label>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Nome Completo</label>
             <div class="relative">
-              <User class="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <input v-model="form.name" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 transition-all placeholder:text-slate-400" placeholder="Ex: João da Silva" />
+              <User class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input v-model="form.name" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="Ex: João da Silva" />
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">CPF / CNPJ</label>
+              <label class="block text-[13px] font-medium text-slate-700 mb-1.5">CPF / CNPJ</label>
               <div class="relative">
-                <FileText class="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input v-model="form.document" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 transition-all placeholder:text-slate-400" placeholder="000.000.000-00" />
+                <FileText class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input v-model="form.document" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="000.000.000-00" />
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Telefone</label>
+              <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Telefone</label>
               <div class="relative">
-                <Phone class="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input :value="form.phone" @input="onPhoneInput" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 transition-all placeholder:text-slate-400" placeholder="(00) 00000-0000" />
+                <Phone class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input :value="form.phone" @input="onPhoneInput" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="(00) 00000-0000" />
               </div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Limite (R$)</label>
+              <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Limite (R$)</label>
               <div class="relative">
-                <span class="absolute left-3 top-2.5 text-slate-400 font-bold text-sm">R$</span>
-                <input v-model="form.credit_limit" type="number" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 transition-all placeholder:text-slate-400" placeholder="0,00" />
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">R$</span>
+                <input v-model="form.credit_limit" type="number" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-bold text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="0,00" />
               </div>
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Taxa Padrão</label>
+              <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Taxa Padrão</label>
               <div class="relative">
-                <input v-model="form.standard_rate" type="number" step="0.1" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 transition-all placeholder:text-slate-400" placeholder="4.0" />
-                <span class="absolute right-4 top-2.5 text-slate-400 font-bold text-sm">%</span>
+                <input v-model="form.standard_rate" type="number" step="0.1" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-bold text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="4.0" />
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">%</span>
               </div>
             </div>
           </div>
 
           <div class="pt-2 border-t border-slate-100 mt-2">
-            <h4 class="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Endereço</h4>
+            <h4 class="text-sm font-semibold text-slate-900 mb-3 pt-3">Endereço</h4>
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
               
               <div class="md:col-span-4">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">CEP</label>
-                <input v-model="form.zip_code" type="text" placeholder="00000-000" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">CEP</label>
+                <input v-model="form.zip_code" type="text" placeholder="00000-000" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
               </div>
 
               <div class="md:col-span-8">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Logradouro (Rua, Av, N°)</label>
-                <input v-model="form.address" type="text" placeholder="Ex: Av. Brasil, 123" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Logradouro (Rua, Av, N°)</label>
+                <input v-model="form.address" type="text" placeholder="Ex: Av. Brasil, 123" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
               </div>
 
               <div class="md:col-span-5">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Bairro</label>
-                <input v-model="form.neighborhood" type="text" placeholder="Centro" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Bairro</label>
+                <input v-model="form.neighborhood" type="text" placeholder="Centro" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
               </div>
 
               <div class="md:col-span-5">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Cidade</label>
-                <input v-model="form.city" type="text" placeholder="Foz do Iguaçu" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Cidade</label>
+                <input v-model="form.city" type="text" placeholder="Foz do Iguaçu" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
               </div>
 
               <div class="md:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">UF</label>
-                <input v-model="form.state" type="text" placeholder="PR" maxlength="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-sm uppercase text-center" />
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">UF</label>
+                <input v-model="form.state" type="text" placeholder="PR" maxlength="2" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm uppercase text-center focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
               </div>
 
             </div>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Observações</label>
-            <textarea v-model="form.notes" rows="3" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 transition-all resize-none placeholder:text-slate-400" placeholder="Anotações internas sobre o cliente..."></textarea>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Observações</label>
+            <textarea v-model="form.notes" rows="3" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all resize-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="Anotações internas sobre o cliente..."></textarea>
           </div>
         </div>
 
-        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 flex-shrink-0">
-          <button @click="showModal = false" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors text-sm">Cancelar</button>
-          <button @click="salvarCliente" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center transition-all active:scale-95 text-sm">
+        <div class="px-6 py-4 bg-slate-50/70 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
+          <button @click="showModal = false" class="px-4 py-2.5 rounded-lg font-semibold text-slate-700 bg-white border border-slate-300 shadow-xs hover:bg-slate-50 transition-colors text-sm">Cancelar</button>
+          <button @click="salvarCliente" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-all active:scale-[0.98] text-sm">
             <Loader2 v-if="saving" class="w-4 h-4 mr-2 animate-spin" />
-            {{ saving ? 'Salvando...' : 'Salvar Cliente' }}
+            {{ saving ? 'Salvando...' : 'Salvar cliente' }}
           </button>
         </div>
       </div>

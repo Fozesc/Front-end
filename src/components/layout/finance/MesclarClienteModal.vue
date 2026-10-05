@@ -65,16 +65,16 @@ const confirmar = async () => {
 
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
 
-      <div class="bg-slate-900 px-6 py-4 flex justify-between items-center shrink-0">
+      <div class="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center shrink-0">
         <div>
-          <h2 class="text-xl font-bold text-white flex items-center">
-            <Merge class="w-5 h-5 mr-2 text-amber-400" /> Juntar cadastros do mesmo cliente
+          <h2 class="text-base font-semibold text-slate-900 flex items-center">
+            <Merge class="w-5 h-5 mr-2 text-amber-600" /> Juntar cadastros do mesmo cliente
           </h2>
-          <p class="text-slate-400 text-xs mt-0.5">
-            Partindo de <strong class="text-slate-200">{{ cliente.name }}</strong>
+          <p class="text-slate-500 text-sm mt-0.5">
+            Partindo de <strong class="text-slate-700">{{ cliente.name }}</strong>
           </p>
         </div>
-        <button @click="emit('close')" class="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
+        <button @click="emit('close')" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
           <X class="w-5 h-5" />
         </button>
       </div>
@@ -91,13 +91,13 @@ const confirmar = async () => {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">
             1. Qual é o outro cadastro dessa mesma pessoa?
           </label>
           <div class="relative">
             <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input v-model="busca" type="text" placeholder="Digite o nome ou o CPF/CNPJ..."
-                   class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                   class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
 
           <p v-if="buscando" class="text-xs text-slate-400 mt-2">Procurando...</p>
@@ -124,7 +124,7 @@ const confirmar = async () => {
         </div>
 
         <div v-if="escolhido">
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">
             2. Qual cadastro deve ficar?
           </label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -133,7 +133,7 @@ const confirmar = async () => {
                     class="text-left border-2 rounded-xl p-3 transition-all"
                     :class="manter === opcao.k ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-[11px] font-bold uppercase"
+                <span class="text-xs font-semibold"
                       :class="manter === opcao.k ? 'text-emerald-700' : 'text-slate-400'">
                   {{ manter === opcao.k ? 'Este fica' : 'Este será apagado' }}
                 </span>
@@ -168,23 +168,23 @@ const confirmar = async () => {
         </div>
 
         <div v-if="escolhido">
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5 flex items-center">
             <Lock class="w-3.5 h-3.5 mr-1.5" /> 3. Sua senha para confirmar
           </label>
           <input v-model="senha" type="password" autocomplete="current-password"
                  @keyup.enter="confirmar" placeholder="Senha do seu login"
-                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
         </div>
 
         <p v-if="erro" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">{{ erro }}</p>
       </div>
 
-      <div class="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-end gap-3 shrink-0">
-        <button @click="emit('close')" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors text-sm">
+      <div class="bg-slate-50/70 border-t border-slate-200 px-6 py-4 flex justify-end gap-3 shrink-0">
+        <button @click="emit('close')" class="px-4 py-2.5 rounded-lg transition-colors text-sm bg-white border border-slate-300 text-slate-700 font-semibold shadow-xs hover:bg-slate-50">
           Cancelar
         </button>
         <button @click="confirmar" :disabled="salvando || !escolhido"
-                class="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-200 flex items-center transition-all active:scale-95 text-sm">
+                class="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-semibold shadow-xs flex items-center transition-all active:scale-[0.98] text-sm">
           <Merge class="w-4 h-4 mr-2" />
           {{ salvando ? 'Juntando...' : 'Juntar e apagar o antigo' }}
         </button>

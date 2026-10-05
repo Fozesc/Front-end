@@ -125,15 +125,15 @@ const larguraCheia = (i) => {
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="$emit('close')"></div>
 
     <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl relative z-10 animate-scale-in overflow-hidden">
-      <div class="bg-slate-900 p-5 flex justify-between items-center">
-        <h2 class="text-white text-lg font-bold flex items-center gap-2"><FileText class="w-5 h-5 text-emerald-400" /> Gerar Relatório</h2>
-        <button @click="$emit('close')" class="text-slate-400 hover:text-white"><X class="w-5 h-5" /></button>
+      <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+        <h2 class="text-slate-900 text-base font-semibold flex items-center gap-2"><FileText class="w-5 h-5 text-indigo-600" /> Gerar relatório</h2>
+        <button @click="$emit('close')" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"><X class="w-5 h-5" /></button>
       </div>
 
       <div class="p-6 space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Relatório</label>
-          <select v-model="filtro.tipo" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Tipo de Relatório</label>
+          <select v-model="filtro.tipo" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow">
             <option value="geral">Resumo Geral (Fluxo)</option>
             <option value="inadimplencia">Relatório de Inadimplência</option>
             <option value="lucro">Demonstrativo de Lucros</option>
@@ -141,12 +141,12 @@ const larguraCheia = (i) => {
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">De</label>
-            <input v-model="filtro.inicio" type="date" class="w-full p-2 border border-slate-300 rounded-lg outline-none" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">De</label>
+            <input v-model="filtro.inicio" type="date" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Até</label>
-            <input v-model="filtro.fim" type="date" class="w-full p-2 border border-slate-300 rounded-lg outline-none" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Até</label>
+            <input v-model="filtro.fim" type="date" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
         </div>
 
@@ -155,9 +155,9 @@ const larguraCheia = (i) => {
         </p>
       </div>
 
-      <div class="bg-slate-50 p-4 border-t border-slate-200 flex justify-end gap-2">
-        <button @click="$emit('close')" class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-        <button @click="gerar" :disabled="carregando" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-lg shadow-md flex items-center transition-all">
+      <div class="bg-slate-50/70 px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+        <button @click="$emit('close')" class="px-4 py-2 rounded-lg transition-colors bg-white border border-slate-300 text-slate-700 font-semibold shadow-xs hover:bg-slate-50 text-sm">Cancelar</button>
+        <button @click="gerar" :disabled="carregando" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-lg shadow-xs flex items-center transition-all text-sm">
           <Loader2 v-if="carregando" class="w-4 h-4 mr-2 animate-spin" />
           <FileText v-else class="w-4 h-4 mr-2" />
           {{ carregando ? 'Buscando dados...' : 'Gerar relatório' }}
@@ -169,23 +169,23 @@ const larguraCheia = (i) => {
   <!-- ETAPA 2: prévia em tela cheia; é o mesmo papel que sai na impressora -->
   <Teleport to="body">
     <div v-if="relatorio" class="relatorio-tela">
-      <div class="print:hidden sticky top-0 z-10 bg-slate-900 text-white px-6 py-3 flex items-center justify-between shadow-lg">
-        <button @click="relatorio = null" class="flex items-center gap-2 text-sm font-bold text-slate-300 hover:text-white">
+      <div class="print:hidden sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-slate-200 text-slate-900 px-6 py-3 flex items-center justify-between shadow-sm">
+        <button @click="relatorio = null" class="flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100">
           <ArrowLeft class="w-4 h-4" /> Trocar período
         </button>
-        <span class="text-sm font-bold hidden sm:block">Prévia do relatório</span>
+        <span class="text-sm font-semibold hidden sm:block">Prévia do relatório</span>
         <div class="flex gap-2">
-          <button @click="imprimir" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-sm flex items-center gap-2">
+          <button @click="imprimir" class="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm shadow-xs flex items-center gap-2">
             <Printer class="w-4 h-4" /> Imprimir / PDF
           </button>
-          <button @click="relatorio = null; $emit('close')" class="p-2 text-slate-400 hover:text-white"><X class="w-5 h-5" /></button>
+          <button @click="relatorio = null; $emit('close')" class="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"><X class="w-5 h-5" /></button>
         </div>
       </div>
 
       <div class="print-paper">
         <div class="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
           <div>
-            <h1 class="text-3xl font-bold uppercase tracking-widest">{{ relatorio.empresa }}</h1>
+            <h1 class="text-3xl font-bold uppercase tracking-wider">{{ relatorio.empresa }}</h1>
             <p class="text-sm text-gray-500 uppercase mt-1">
               Relatório Gerencial<span v-if="relatorio.cnpj"> · CNPJ {{ relatorio.cnpj }}</span>
             </p>

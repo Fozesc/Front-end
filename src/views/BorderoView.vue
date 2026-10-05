@@ -352,55 +352,55 @@ const processarSalvamento = async () => {
     <div v-if="limitModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 p-6 text-center animate-scale-in">
-        <div class="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle class="w-8 h-8 text-amber-600" /></div>
-        <h3 class="text-xl font-bold text-slate-900 mb-2">Limite de Crédito Excedido</h3>
-        <p class="text-slate-600 mb-4">{{ limitModal.message }}</p>
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+        <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle class="w-6 h-6 text-amber-600" /></div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-1">Limite de crédito excedido</h3>
+        <p class="text-slate-600 text-sm mb-4">{{ limitModal.message }}</p>
+        <div class="bg-amber-50 border border-amber-200/80 rounded-xl p-4 mb-6 text-left">
           <div class="flex justify-between text-sm mb-1"><span class="text-amber-800">Limite Atual:</span><span class="font-bold text-amber-900">{{ formatCurrency(header.clienteLimite) }}</span></div>
           <div class="flex justify-between text-sm mb-1"><span class="text-amber-800">Dívida + Atual:</span><span class="font-bold text-amber-900">{{ formatCurrency(header.clienteDivida + totais.bruto) }}</span></div>
           <div class="border-t border-amber-200 my-2"></div>
           <div class="flex justify-between text-base font-bold text-red-600"><span>Excesso:</span><span>+ {{ formatCurrency(limitModal.overAmount) }}</span></div>
         </div>
         <div class="flex gap-3 justify-center">
-          <button @click="limitModal.visible = false" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200">Cancelar</button>
-          <button @click="limitModal.onConfirm" class="px-5 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-md">Efetivar</button>
+          <button @click="limitModal.visible = false" class="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold text-sm rounded-lg shadow-xs hover:bg-slate-50">Cancelar</button>
+          <button @click="limitModal.onConfirm" class="flex-1 px-4 py-2.5 bg-red-600 text-white font-semibold text-sm rounded-lg hover:bg-red-700 shadow-xs">Efetivar mesmo assim</button>
         </div>
       </div>
     </div>
 
-    <div v-if="modalState.visible" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 transition-opacity">
-      <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100">
-        <div :class="`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6 ${modalState.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`">
-          <CheckCircle v-if="modalState.type === 'success'" class="h-10 w-10 text-emerald-600" /><AlertTriangle v-else class="h-10 w-10 text-red-600" />
+    <div v-if="modalState.visible" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity p-4">
+      <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center animate-scale-in">
+        <div :class="`mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 ${modalState.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`">
+          <CheckCircle v-if="modalState.type === 'success'" class="h-6 w-6 text-emerald-600" /><AlertTriangle v-else class="h-6 w-6 text-red-600" />
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ modalState.title }}</h3>
-        <p class="text-slate-500 mb-8">{{ modalState.message }}</p>
-        <button @click="modalState.visible = false" :class="`w-full py-3 px-4 rounded-xl text-white font-bold text-lg shadow-lg ${modalState.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`">Entendido</button>
+        <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ modalState.title }}</h3>
+        <p class="text-slate-500 text-sm mb-6">{{ modalState.message }}</p>
+        <button @click="modalState.visible = false" :class="`w-full py-2.5 px-4 rounded-lg text-white font-semibold text-sm shadow-xs ${modalState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`">Entendido</button>
       </div>
     </div>
 
     <div class="print:hidden">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div class="flex items-center gap-3">
-          <button @click="router.back()" class="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ArrowLeft class="w-6 h-6" /></button>
-          <div><h1 class="text-3xl font-bold text-slate-900">Cálculo de Borderô</h1><p class="text-slate-500 text-sm">Novo borderô de cheques ou antecipação.</p></div>
+          <button @click="router.back()" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 shadow-xs hover:bg-slate-50 rounded-lg text-slate-500"><ArrowLeft class="w-[18px] h-[18px]" /></button>
+          <div><h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Cálculo de Borderô</h1><p class="text-slate-500 text-sm mt-0.5">Novo borderô de cheques ou antecipação.</p></div>
         </div>
-        <div class="flex gap-3 items-center">
+        <div class="flex gap-2.5 items-center">
           
           <div class="relative">
-            <select v-model="selectedCompany" class="appearance-none bg-slate-100 border border-slate-300 text-slate-700 font-bold py-2.5 pl-4 pr-8 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            <select v-model="selectedCompany" class="appearance-none bg-white border border-slate-300 text-slate-700 font-semibold h-9 pl-3.5 pr-9 rounded-lg cursor-pointer text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
               <option value="Fozesc">Fozesc</option>
               <option value="PQ">PQ</option>
             </select>
-            <Building2 class="w-4 h-4 absolute right-3 top-3 text-slate-500 pointer-events-none" />
+            <Building2 class="w-4 h-4 absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
           </div>
 
-          <button @click="exportarBordero" class="bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-lg font-bold shadow-sm flex items-center"><Printer class="w-5 h-5 mr-2" /> Simular</button>
-          <button @click="verificarLimiteESalvar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-md flex items-center"><Save class="w-5 h-5 mr-2" /> Efetivar</button>
+          <button @click="exportarBordero" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs hover:bg-slate-50 flex items-center transition-colors"><Printer class="w-4 h-4 mr-2 text-slate-500" /> Simular</button>
+          <button @click="verificarLimiteESalvar" class="bg-emerald-600 hover:bg-emerald-700 text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-colors"><Save class="w-4 h-4 mr-2" /> Efetivar</button>
         </div>
       </div>
 
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 relative z-30">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200/80 mb-6 relative z-30">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           
           <div class="relative group">
@@ -409,107 +409,107 @@ const processarSalvamento = async () => {
               @select="selecionarCliente"
             />
             
-            <div v-if="header.clienteId && header.clienteLimite > 0" class="absolute right-0 top-0 text-[10px] font-bold mt-1 mr-1">
+            <div v-if="header.clienteId && header.clienteLimite > 0" class="absolute right-0 top-0 text-xs font-medium text-slate-500">
                Disp: <span :class="header.clienteLimite - header.clienteDivida < 0 ? 'text-red-600' : 'text-emerald-600'">{{ formatCurrency(header.clienteLimite - header.clienteDivida) }}</span>
             </div>
           </div>
 
           <div class="relative group">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Emitente do Cheque</label>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Emitente do Cheque</label>
             <input type="text" v-model="header.emitenteNome" @input="buscarEmitentes" @focus="buscarEmitentes"
                    @blur="conferirEmitente" list="emitentes-ja-usados" autocomplete="off"
-                   placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 h-[42px]" />
+                   placeholder="Quem assinou o cheque..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 h-[42px] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
             <datalist id="emitentes-ja-usados">
               <option v-for="nome in emitentesSugeridos" :key="nome" :value="nome" />
             </datalist>
-            <p v-if="emitenteNovo" class="text-[11px] text-amber-700 font-bold mt-1 flex items-center gap-1">
+            <p v-if="emitenteNovo" class="text-xs text-amber-700 font-medium mt-1.5 flex items-center gap-1">
               <AlertTriangle class="w-3 h-3 shrink-0" /> Emitente novo — confira se não é um já cadastrado escrito diferente.
             </p>
           </div>
         </div>
 
-      <div class="md:col-span-2 relative group mt-2">
-        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Observações do Borderô</label>
-        <textarea v-model="header.observacao" rows="2" placeholder="Notas sobre esta negociação..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 resize-none"></textarea>
+      <div class="md:col-span-2 relative group mb-5">
+        <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Observações do Borderô</label>
+        <textarea v-model="header.observacao" rows="2" placeholder="Notas sobre esta negociação..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 resize-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow"></textarea>
       </div>
 
         <div class="grid grid-cols-2 md:grid-cols-7 gap-4">
           <div class="col-span-2 md:col-span-1">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Data</label>
-            <input type="date" v-model="header.dataOperacao" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Data</label>
+            <input type="date" v-model="header.dataOperacao" class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
           <div class="col-span-1 md:col-span-1">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Taxa (%)</label>
-            <input type="number" step="0.01" v-model="header.taxaMensal" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Taxa (%)</label>
+            <input type="number" step="0.01" v-model="header.taxaMensal" class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
           <div class="col-span-1 md:col-span-1">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Compensação</label>
-            <input type="number" v-model="header.diasCompensacao" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Compensação</label>
+            <input type="number" v-model="header.diasCompensacao" class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
           <div class="col-span-2 md:col-span-1">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Banco Padrão</label>
-            <input type="text" v-model="header.bancoPadrao" placeholder="Ex: BB" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Banco Padrão</label>
+            <input type="text" v-model="header.bancoPadrao" placeholder="Ex: BB" class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
 
           <div class="col-span-1 md:col-span-1 flex flex-col justify-center">
-             <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Cobrar IOF?</label>
-             <button @click="header.iofEnabled = !header.iofEnabled" :class="['px-2 py-2.5 rounded-lg text-xs font-bold transition-colors w-full border truncate', header.iofEnabled ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200']">
+             <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Cobrar IOF?</label>
+             <button @click="header.iofEnabled = !header.iofEnabled" :class="['px-2 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full border truncate shadow-xs', header.iofEnabled ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-50']">
                {{ header.iofEnabled ? `Sim (${header.iofBase}%)` : 'Não' }}
              </button>
           </div>
 
            <div class="col-span-1 md:col-span-2">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Conta de Saída</label>
-            <div class="flex bg-slate-50 p-1 rounded-lg border border-slate-200">
-              <button @click="header.contaSaida = 'Dinheiro'" :class="`flex-1 py-1.5 text-xs font-bold rounded ${header.contaSaida === 'Dinheiro' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`"><Wallet class="w-3 h-3 inline mr-1" /> Dinheiro</button>
-              <button @click="header.contaSaida = 'BB'" :class="`flex-1 py-1.5 text-xs font-bold rounded ${header.contaSaida === 'BB' ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}`"><Calculator class="w-3 h-3 inline mr-1" /> BB</button>
-              <button @click="header.contaSaida = 'Caixa'" :class="`flex-1 py-1.5 text-xs font-bold rounded ${header.contaSaida === 'Caixa' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400'}`"><Wallet class="w-3 h-3 inline mr-1" /> Caixa</button>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Conta de Saída</label>
+            <div class="flex bg-slate-100 p-1 rounded-lg gap-0.5">
+              <button @click="header.contaSaida = 'Dinheiro'" :class="`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${header.contaSaida === 'Dinheiro' ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`"><Wallet class="w-3 h-3 inline mr-1" /> Dinheiro</button>
+              <button @click="header.contaSaida = 'BB'" :class="`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${header.contaSaida === 'BB' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`"><Calculator class="w-3 h-3 inline mr-1" /> BB</button>
+              <button @click="header.contaSaida = 'Caixa'" :class="`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${header.contaSaida === 'Caixa' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`"><Wallet class="w-3 h-3 inline mr-1" /> Caixa</button>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm border border-indigo-100 mb-8 overflow-hidden relative z-10">
-        <div class="bg-slate-50/80 px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div class="flex bg-slate-200/60 p-1 rounded-xl">
-            <button @click="gerador.modo = 'valor_mao'" :class="['px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2', gerador.modo === 'valor_mao' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500']"><div class="w-2 h-2 rounded-full bg-purple-500" v-if="gerador.modo === 'valor_mao'"></div> Líquido (Inverso)</button>
-            <button @click="gerador.modo = 'valor_bruto'" :class="['px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2', gerador.modo === 'valor_bruto' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500']"><div class="w-2 h-2 rounded-full bg-indigo-500" v-if="gerador.modo === 'valor_bruto'"></div> Bruto (Padrão)</button>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 mb-6 overflow-hidden relative z-10">
+        <div class="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div class="flex bg-slate-100 p-1 rounded-lg gap-0.5">
+            <button @click="gerador.modo = 'valor_mao'" :class="['px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 transition-all', gerador.modo === 'valor_mao' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700']"><div class="w-2 h-2 rounded-full bg-purple-500" v-if="gerador.modo === 'valor_mao'"></div> Líquido (Inverso)</button>
+            <button @click="gerador.modo = 'valor_bruto'" :class="['px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 transition-all', gerador.modo === 'valor_bruto' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700']"><div class="w-2 h-2 rounded-full bg-indigo-500" v-if="gerador.modo === 'valor_bruto'"></div> Bruto (Padrão)</button>
           </div>
           <div class="flex items-center gap-3">
-            <div class="flex bg-slate-200/60 p-1 rounded-lg">
-              <button @click="gerador.intervaloTipo = 'mensal'" :class="['px-3 py-1.5 text-xs font-bold rounded-md', gerador.intervaloTipo === 'mensal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400']">Mensal</button>
-              <button @click="gerador.intervaloTipo = 'dias'" :class="['px-3 py-1.5 text-xs font-bold rounded-md', gerador.intervaloTipo === 'dias' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400']">Dias</button>
+            <div class="flex bg-slate-100 p-1 rounded-lg gap-0.5">
+              <button @click="gerador.intervaloTipo = 'mensal'" :class="['px-3 py-1.5 text-xs font-semibold rounded-md transition-all', gerador.intervaloTipo === 'mensal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700']">Mensal</button>
+              <button @click="gerador.intervaloTipo = 'dias'" :class="['px-3 py-1.5 text-xs font-semibold rounded-md transition-all', gerador.intervaloTipo === 'dias' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700']">Dias</button>
             </div>
           </div>
         </div>
 
         <div class="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
           <div class="md:col-span-4">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Valor</label>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Valor</label>
             <div class="relative group">
-              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span class="text-indigo-500 font-bold text-lg">R$</span></div>
-              <input type="number" v-model="gerador.valorAlvo" class="w-full pl-12 pr-4 h-12 bg-indigo-50/30 border border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-bold text-lg text-slate-800" placeholder="0,00" />
+              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span class="text-slate-400 font-semibold text-base">R$</span></div>
+              <input type="number" v-model="gerador.valorAlvo" class="w-full pl-12 pr-4 h-12 bg-white border border-slate-300 rounded-lg outline-none font-bold text-lg text-slate-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/15 shadow-xs transition-shadow" placeholder="0,00" />
             </div>
           </div>
           <div class="md:col-span-2">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Qtd</label>
-            <input type="number" v-model="gerador.qtdParcelas" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-bold text-center text-slate-800" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Qtd</label>
+            <input type="number" v-model="gerador.qtdParcelas" class="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg outline-none font-bold text-center text-slate-800 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/15 shadow-xs transition-shadow" />
           </div>
           <div class="md:col-span-3">
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">1º Vencimento</label>
-            <input type="date" v-model="gerador.primeiroVencimento" class="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-medium text-slate-600" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">1º Vencimento</label>
+            <input type="date" v-model="gerador.primeiroVencimento" class="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-600 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/15 shadow-xs transition-shadow" />
           </div>
           <div class="md:col-span-3">
-            <button @click="gerarParcelas" class="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Calculator class="w-5 h-5" /> Gerar Parcelas</button>
+            <button @click="gerarParcelas" class="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center justify-center gap-2 active:scale-[0.98] transition-all text-[15px]"><Calculator class="w-[18px] h-[18px]" /> Gerar parcelas</button>
           </div>
         </div>
       </div>
 
-      <div v-if="avisoDiaUtil" class="mb-6 rounded-xl border p-4 flex flex-col md:flex-row md:items-start gap-4"
-           :class="avisoDiaUtil.ajustado ? 'bg-amber-50 border-amber-200' : 'bg-slate-100 border-slate-300'">
+      <div v-if="avisoDiaUtil" class="mb-6 rounded-xl border p-4 flex flex-col md:flex-row md:items-start gap-4 shadow-xs"
+           :class="avisoDiaUtil.ajustado ? 'bg-amber-50 border-amber-200/80' : 'bg-white border-slate-200'">
         <CalendarClock class="w-5 h-5 mt-0.5 shrink-0" :class="avisoDiaUtil.ajustado ? 'text-amber-600' : 'text-slate-500'" />
         <div class="flex-1 text-sm">
-          <p class="font-bold" :class="avisoDiaUtil.ajustado ? 'text-amber-900' : 'text-slate-800'">
+          <p class="font-semibold" :class="avisoDiaUtil.ajustado ? 'text-amber-900' : 'text-slate-800'">
             {{ avisoDiaUtil.itens.length === 1 ? '1 parcela caía' : avisoDiaUtil.itens.length + ' parcelas caíam' }}
             em dia sem compensação bancária.
             <span v-if="avisoDiaUtil.ajustado">Adiei para o próximo dia útil.</span>
@@ -530,10 +530,10 @@ const processarSalvamento = async () => {
         </div>
         <div class="flex gap-2 shrink-0">
           <button @click="trocarAjusteDiaUtil"
-                  class="px-4 py-2 rounded-lg text-xs font-bold border transition-colors"
+                  class="px-3.5 py-2 rounded-lg text-xs font-semibold border shadow-xs transition-colors"
                   :class="avisoDiaUtil.ajustado
                     ? 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'
-                    : 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'">
+                    : 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700'">
             {{ avisoDiaUtil.ajustado ? 'Não adiar, manter as datas' : 'Adiar para o dia útil' }}
           </button>
           <button @click="avisoDiaUtil = null" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60">
@@ -542,62 +542,62 @@ const processarSalvamento = async () => {
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full text-left whitespace-nowrap">
-            <thead class="bg-slate-50 border-b border-slate-200">
+            <thead class="bg-slate-50/80 border-b border-slate-200">
               <tr>
-                <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase w-10">#</th>
-                <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase w-40">Vencimento</th>
-                <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center w-20">Dias</th>
-                <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-right">Valor Cheque</th>
-                <th class="px-4 py-3 text-xs font-bold text-red-500 bg-red-50 uppercase text-right">Juros</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-slate-500 w-10">#</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-slate-500 w-40">Vencimento</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-slate-500 text-center w-20">Dias</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">Valor Cheque</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-red-600 bg-red-50/60 text-right">Juros</th>
                 
-                <th v-if="header.iofEnabled" class="px-4 py-3 text-xs font-bold text-orange-500 bg-orange-50 uppercase text-right">IOF</th>
+                <th v-if="header.iofEnabled" class="px-4 py-2.5 text-xs font-medium text-orange-600 bg-orange-50/60 text-right">IOF</th>
                 
-                <th class="px-4 py-3 text-xs font-bold text-emerald-600 bg-emerald-50 uppercase text-right">Líquido</th>
-                <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Banco / Doc</th>
-                <th class="px-4 py-3 w-10"></th>
+                <th class="px-4 py-2.5 text-xs font-medium text-emerald-700 bg-emerald-50/60 text-right">Líquido</th>
+                <th class="px-4 py-2.5 text-xs font-medium text-slate-500">Banco / Doc</th>
+                <th class="px-4 py-2.5 w-10"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="(item, index) in itens" :key="item.id" class="hover:bg-slate-50">
-                <td class="px-4 py-3 text-xs font-bold text-slate-400">{{ index + 1 }}</td>
+              <tr v-for="(item, index) in itens" :key="item.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-xs font-medium text-slate-400 tabular-nums">{{ index + 1 }}</td>
                 <td class="px-4 py-3">
-                  <input type="date" v-model="item.vencimento" @change="alterarVencimento(item)" class="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm outline-none focus:border-indigo-500 text-slate-600 font-medium" />
-                  <div v-if="item.ajuste" class="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-700" :title="`Adiado por: ${item.ajuste.motivo}`">
+                  <input type="date" v-model="item.vencimento" @change="alterarVencimento(item)" class="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-sm outline-none text-slate-600 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
+                  <div v-if="item.ajuste" class="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700" :title="`Adiado por: ${item.ajuste.motivo}`">
                     <CalendarClock class="w-3 h-3 shrink-0" /> era {{ dataBR(item.ajuste.de) }} · {{ item.ajuste.motivo }}
                   </div>
-                  <div v-else-if="motivoNaoUtil(item.vencimento)" class="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                  <div v-else-if="motivoNaoUtil(item.vencimento)" class="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-600">
                     <AlertTriangle class="w-3 h-3 shrink-0" /> cai em {{ motivoNaoUtil(item.vencimento) }}
                   </div>
                 </td>
-                <td class="px-4 py-3 text-center"><span class="inline-block bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded min-w-[3rem]">{{ item.dias }}</span></td>
-                <td class="px-4 py-3"><input type="number" step="0.01" v-model="item.valor" @input="recalcularLinha(item)" class="w-full text-right bg-white border border-slate-200 rounded px-2 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500" /></td>
-                <td class="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30 text-sm">-{{ formatCurrency(item.juros) }}</td>
+                <td class="px-4 py-3 text-center"><span class="inline-block bg-slate-100 ring-1 ring-inset ring-slate-200 text-slate-700 text-xs font-semibold px-2 py-1 rounded-md min-w-[3rem] tabular-nums">{{ item.dias }}</span></td>
+                <td class="px-4 py-3"><input type="number" step="0.01" v-model="item.valor" @input="recalcularLinha(item)" class="w-full text-right bg-white border border-slate-300 rounded px-2 py-1.5 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></td>
+                <td class="px-4 py-3 text-right font-semibold text-red-600 bg-red-50/30 text-sm tabular-nums">-{{ formatCurrency(item.juros) }}</td>
                 
-                <td v-if="header.iofEnabled" class="px-4 py-3 text-right font-bold text-orange-600 bg-orange-50/30 text-sm">-{{ formatCurrency(item.iof) }}</td>
+                <td v-if="header.iofEnabled" class="px-4 py-3 text-right font-semibold text-orange-600 bg-orange-50/30 text-sm tabular-nums">-{{ formatCurrency(item.iof) }}</td>
 
-                <td class="px-4 py-3 text-right font-bold text-emerald-600 bg-emerald-50/30 text-sm">{{ formatCurrency(item.liquido) }}</td>
-                <td class="px-4 py-3"><div class="flex gap-2"><input type="text" v-model="item.banco" placeholder="Banco" class="w-20 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs" /><input type="text" v-model="item.num_doc" placeholder="Doc" class="w-20 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs" /></div></td>
-                <td class="px-4 py-3 text-center"><button @click="removerLinha(index)" class="text-slate-300 hover:text-red-500"><Trash2 class="w-4 h-4" /></button></td>
+                <td class="px-4 py-3 text-right font-semibold text-emerald-700 bg-emerald-50/30 text-sm tabular-nums">{{ formatCurrency(item.liquido) }}</td>
+                <td class="px-4 py-3"><div class="flex gap-2"><input type="text" v-model="item.banco" placeholder="Banco" class="w-20 bg-white border border-slate-300 rounded px-2 py-1.5 text-xs focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" /><input type="text" v-model="item.num_doc" placeholder="Doc" class="w-20 bg-white border border-slate-300 rounded px-2 py-1.5 text-xs focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" /></div></td>
+                <td class="px-4 py-3 text-center"><button @click="removerLinha(index)" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4" /></button></td>
               </tr>
             </tbody>
           </table>
-          <div class="p-3 bg-slate-50 border-t border-slate-200"><button @click="adicionarLinha" class="w-full py-2 border border-dashed border-slate-300 rounded-lg text-slate-500 text-xs font-bold hover:bg-white hover:text-indigo-600 transition-all flex items-center justify-center gap-2"><Plus class="w-4 h-4" /> Adicionar Cheque</button></div>
+          <div class="p-3 border-t border-slate-100"><button @click="adicionarLinha" class="w-full py-2.5 border border-dashed border-slate-300 rounded-lg text-slate-500 text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50/40 hover:text-indigo-700 transition-all flex items-center justify-center gap-2"><Plus class="w-4 h-4" /> Adicionar cheque</button></div>
         </div>
       </div>
     </div>
     
-    <div class="print:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 z-40 border-t border-slate-700 md:pl-64 shadow-lg">
-      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="print:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md text-slate-900 px-4 py-3 z-40 border-t border-slate-200 md:pl-64 shadow-[0_-8px_24px_-12px_rgb(16_24_40/0.12)]">
+      <div class="max-w-7xl mx-auto md:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex gap-8 text-sm">
-          <div><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">Bruto</span><span class="font-bold text-xl">{{ formatCurrency(totais.bruto) }}</span></div>
-          <div><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">Juros</span><span class="font-bold text-xl text-red-400">-{{ formatCurrency(totais.juros) }}</span></div>
+          <div><span class="block text-slate-500 text-xs font-medium">Bruto</span><span class="font-semibold text-xl tracking-tight tabular-nums">{{ formatCurrency(totais.bruto) }}</span></div>
+          <div><span class="block text-slate-500 text-xs font-medium">Juros</span><span class="font-semibold text-xl tracking-tight tabular-nums text-red-600">-{{ formatCurrency(totais.juros) }}</span></div>
           
-          <div v-if="header.iofEnabled"><span class="block text-slate-400 text-[10px] uppercase font-bold tracking-wider">IOF</span><span class="font-bold text-xl text-orange-400">-{{ formatCurrency(totais.iof) }}</span></div>
+          <div v-if="header.iofEnabled"><span class="block text-slate-500 text-xs font-medium">IOF</span><span class="font-semibold text-xl tracking-tight tabular-nums text-orange-600">-{{ formatCurrency(totais.iof) }}</span></div>
         </div>
-        <div class="flex items-center gap-4 bg-slate-800 px-6 py-2 rounded-xl border border-slate-700"><span class="text-xs font-bold text-indigo-300 uppercase tracking-widest text-right">Líquido<br>a Pagar</span><span class="text-3xl font-extrabold text-white">{{ formatCurrency(totais.liquido) }}</span></div>
+        <div class="flex items-center gap-4 bg-slate-900 px-5 py-2.5 rounded-xl shadow-md"><span class="text-xs font-medium text-slate-400 text-right leading-tight">Líquido<br>a pagar</span><span class="text-2xl font-semibold tracking-tight tabular-nums text-white">{{ formatCurrency(totais.liquido) }}</span></div>
       </div>
     </div>
 

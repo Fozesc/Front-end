@@ -292,16 +292,16 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
   <div v-if="isOpen" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="$emit('close')"></div>
 
-    <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]" data-modal="prorrogacao">
-      <div class="bg-indigo-900 p-4 flex justify-between items-center text-white">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]" data-modal="prorrogacao">
+      <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-start">
         <div>
-          <h3 class="font-bold flex items-center gap-2"><CalendarClock class="w-5 h-5"/> {{ prorrogar ? 'Prorrogar título' : 'Pagamento parcial' }}</h3>
-          <p class="text-xs text-indigo-200 mt-0.5">Cheque #{{ cheque.numero || 'S/N' }} · {{ cheque.emitente || cheque.cliente }} · {{ cheque.cliente }}</p>
+          <h3 class="text-base font-semibold text-slate-900 flex items-center gap-2"><CalendarClock class="w-5 h-5 text-indigo-600"/> {{ prorrogar ? 'Prorrogar título' : 'Pagamento parcial' }}</h3>
+          <p class="text-sm text-slate-500 mt-0.5">Cheque #{{ cheque.numero || 'S/N' }} · {{ cheque.emitente || cheque.cliente }} · {{ cheque.cliente }}</p>
         </div>
-        <button @click="$emit('close')" class="hover:text-indigo-200 transition-colors"><X class="w-5 h-5"/></button>
+        <button @click="$emit('close')" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X class="w-5 h-5"/></button>
       </div>
 
-      <div class="p-5 space-y-4 overflow-y-auto text-sm">
+      <div class="p-6 space-y-4 overflow-y-auto text-sm">
         <div v-if="errorMessage" class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg font-bold flex items-center gap-2">
           <AlertTriangle class="w-4 h-4 shrink-0" /> {{ errorMessage }}
         </div>
@@ -310,28 +310,28 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
         <div class="rounded-lg border border-slate-200 overflow-hidden">
           <div class="grid grid-cols-4 gap-3 p-3 bg-slate-50">
             <div>
-              <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Vencimento atual</div>
+              <div class="text-xs font-medium text-slate-500 mb-1">Vencimento atual</div>
               <div class="font-bold text-slate-800 h-[38px] flex items-center">{{ dataBR(vencimentoAtual) }}</div>
             </div>
             <template v-if="prorrogar">
               <div>
-                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nova data</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Nova data</label>
                 <input type="date" v-model="form.new_date" data-campo="nova-data"
-                       class="w-full border border-slate-300 rounded-lg px-2 py-1.5 font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                       class="w-full border border-slate-300 rounded-lg px-2 py-1.5 font-bold text-slate-700 bg-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow">
               </div>
               <div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Prazo</div>
+                <div class="text-xs font-medium text-slate-500 mb-1">Prazo</div>
                 <div class="font-bold text-slate-800 h-[38px] flex flex-col justify-center leading-tight">
                   {{ r.dias > 0 ? r.dias + ' dias' : '—' }}
                   <span class="text-[10px] font-normal text-slate-400">{{ form.dias_comp }} de compensação</span>
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Taxa a.m.</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">Taxa a.m.</label>
                 <div class="flex items-center gap-2">
                   <div class="relative flex-1">
                     <input type="number" step="0.01" v-model="form.taxa" data-campo="taxa"
-                           class="w-full border border-slate-300 rounded-lg px-2 py-1.5 pr-6 font-bold text-slate-800 bg-white">
+                           class="w-full border border-slate-300 rounded-lg px-2 py-1.5 pr-6 font-bold text-slate-800 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
                     <span class="absolute right-2 top-1.5 text-slate-400 font-bold">%</span>
                   </div>
                   <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer" :title="`IOF ${iofBase}% + ${iofDiario}% ao dia`">
@@ -357,13 +357,13 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
 
           <div class="grid grid-cols-4 gap-3 p-3 border-t border-slate-200">
             <div>
-              <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Valor devido</div>
+              <div class="text-xs font-medium text-slate-500 mb-1">Valor devido</div>
               <div class="font-bold text-slate-800 tabular-nums">{{ moeda(r.saldoBase) }}</div>
               <div v-if="cheque.juros_pendentes > 0" class="text-[10px] text-amber-700">inclui {{ moeda(cheque.juros_pendentes) }} de juros</div>
               <div v-if="r.ajuste" class="text-[10px] text-amber-700">ajuste {{ moeda(r.ajuste) }}</div>
             </div>
             <div>
-              <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">+ Juros</div>
+              <div class="text-xs font-medium text-slate-500 mb-1">+ Juros</div>
               <div class="font-bold text-red-700 tabular-nums" data-campo="juros-valor">{{ moeda(r.juros) }}</div>
               <div v-if="prorrogar" class="text-[10px] text-slate-400">
                 <template v-if="jurosManual === null">{{ form.iof ? 'juros ' + moeda(r.calculado.juros) + ' + IOF ' + moeda(r.calculado.iof) : 'Borderô Líquido (Inverso)' }}</template>
@@ -371,18 +371,18 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
               </div>
             </div>
             <div>
-              <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">= Total</div>
+              <div class="text-xs font-medium text-slate-500 mb-1">= Total</div>
               <div class="font-bold text-slate-800 tabular-nums">{{ moeda(r.totalComJuros) }}</div>
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">− Cliente paga agora</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">− Cliente paga agora</label>
               <div class="relative">
                 <span class="absolute left-2 top-1.5 text-slate-400 font-bold text-xs">R$</span>
                 <input type="number" step="0.01" min="0" :value="r.pago" @input="pagoManual = numero($event.target.value)" data-campo="pago"
-                       class="w-full border rounded-lg px-2 py-1.5 pl-7 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                       class="w-full border rounded-lg px-2 py-1.5 pl-7 font-bold text-slate-800 outline-none border-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 shadow-xs transition-shadow"
                        :class="pagoManual !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-300'">
               </div>
-              <select v-if="r.pago > 0 && !dividido" v-model="pagamento.conta" class="mt-1 w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-[11px] font-bold text-slate-600" title="Conta onde o dinheiro entra">
+              <select v-if="r.pago > 0 && !dividido" v-model="pagamento.conta" class="mt-1 w-full bg-white border border-slate-300 rounded px-1 py-0.5 text-[11px] font-bold text-slate-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" title="Conta onde o dinheiro entra">
                 <option value="Dinheiro">entra no Dinheiro</option>
                 <option value="BB">entra no Banco do Brasil</option>
                 <option value="Caixa">entra na Caixa Econômica</option>
@@ -400,13 +400,13 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
           </div>
 
           <div v-if="dividido && r.pago > 0" class="p-3 border-t border-slate-200 bg-slate-50/50">
-            <div class="text-[10px] font-bold text-slate-400 uppercase mb-2">Pagamento de {{ moeda(r.pago) }} dividido</div>
+            <div class="text-xs font-medium text-slate-500 mb-2">Pagamento de {{ moeda(r.pago) }} dividido</div>
             <PartesPagamento v-model="partes" :total="r.pago" compacto />
           </div>
 
           <div class="p-3 bg-indigo-50 border-t border-indigo-100 flex justify-between items-center gap-3">
             <div class="text-xs">
-              <div class="font-bold text-indigo-700 uppercase text-[11px]">Novo valor devido<template v-if="prorrogar && form.new_date"> em {{ dataBR(form.new_date) }}</template></div>
+              <div class="font-semibold text-indigo-700 text-xs">Novo valor devido<template v-if="prorrogar && form.new_date"> em {{ dataBR(form.new_date) }}</template></div>
               <div v-if="avisoCalculo" class="font-bold text-red-600 flex items-center gap-1 mt-0.5"><AlertTriangle class="w-3.5 h-3.5" /> {{ avisoCalculo }}</div>
               <div v-else class="text-slate-600 mt-0.5" data-campo="divisao">
                 <template v-if="!r.pago">Nada pago agora<template v-if="r.juros > 0">: os juros somam no valor devido</template>.</template>
@@ -418,17 +418,17 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
                 <template v-if="r.novoTotal === r.total"> Fica igual ao de hoje.</template>
               </div>
             </div>
-            <div class="text-2xl font-black text-indigo-900 tabular-nums whitespace-nowrap" data-campo="novo-total">{{ moeda(r.novoTotal) }}</div>
+            <div class="text-2xl font-bold text-indigo-900 tabular-nums whitespace-nowrap" data-campo="novo-total">{{ moeda(r.novoTotal) }}</div>
           </div>
         </div>
 
         <!-- nota: o que o cliente assina -->
         <div class="border border-dashed border-slate-300 rounded-lg px-4 py-3 bg-white" data-campo="nota">
-          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Resumo para o cliente</div>
+          <div class="text-xs font-medium text-slate-500 mb-1">Resumo para o cliente</div>
           <table class="w-full text-xs">
             <tbody>
               <tr v-for="(l, i) in nota" :key="i"
-                  :class="{ 'text-slate-500': l.tipo === 'detalhe', 'font-bold border-t border-slate-300': l.tipo === 'subtotal', 'font-black text-sm border-t-2 border-slate-800': l.tipo === 'total' }">
+                  :class="{ 'text-slate-500': l.tipo === 'detalhe', 'font-bold border-t border-slate-300': l.tipo === 'subtotal', 'font-bold text-sm border-t-2 border-slate-800': l.tipo === 'total' }">
                 <td class="py-1" :class="l.tipo === 'detalhe' ? 'pl-4 text-[11px]' : ''">{{ l.rotulo }}</td>
                 <td class="py-1 text-right tabular-nums whitespace-nowrap" :class="l.tipo === 'detalhe' ? 'text-[11px]' : ''">{{ moeda(l.valor) }}</td>
               </tr>
@@ -445,45 +445,45 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
         <div v-if="maisOpcoes" class="space-y-3">
           <div v-if="prorrogar" class="grid grid-cols-3 gap-3">
             <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Juros a partir de</label>
-              <input type="date" v-model="form.data_base" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-700 text-xs">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Juros a partir de</label>
+              <input type="date" v-model="form.data_base" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-700 text-xs focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
               <div class="flex gap-2 mt-1 text-[10px] font-bold">
                 <button v-if="form.data_base !== vencimentoAtual" @click="form.data_base = vencimentoAtual" class="text-indigo-600 hover:underline">vencimento</button>
                 <button v-if="form.data_base !== hoje" @click="form.data_base = hoje" class="text-indigo-600 hover:underline">hoje</button>
               </div>
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Dias de compensação</label>
-              <input type="number" step="1" min="0" v-model.number="form.dias_comp" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Dias de compensação</label>
+              <input type="number" step="1" min="0" v-model.number="form.dias_comp" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
             </div>
             <div class="text-[10px] text-slate-400 self-center">IOF quando marcado: {{ iofBase }}% + {{ iofDiario }}% ao dia</div>
           </div>
 
           <div class="grid grid-cols-3 gap-3">
             <div v-if="prorrogar">
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Juros da prorrogação</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Juros da prorrogação</label>
               <div class="relative">
                 <span class="absolute left-3 top-2 text-slate-400 font-bold">R$</span>
                 <input type="number" step="0.01" min="0" :value="r.juros" @input="jurosManual = numero($event.target.value)" data-campo="juros"
-                       class="w-full border rounded-lg p-2 pl-9 font-bold text-red-700" :class="jurosManual !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-300'">
+                       class="w-full border rounded-lg p-2 pl-9 font-bold text-red-700 border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" :class="jurosManual !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-300'">
               </div>
-              <div class="text-[10px] text-slate-500 mt-0.5">
+              <div class="text-[11px] text-slate-500 mt-0.5">
                 <template v-if="jurosManual === null">juros {{ moeda(r.calculado.juros) }} + IOF {{ moeda(r.calculado.iof) }}</template>
                 <button v-else @click="jurosManual = null" class="font-bold text-indigo-600 hover:underline"><RotateCcw class="w-3 h-3 inline"/> calculado: {{ moeda(r.calculado.encargos) }}</button>
               </div>
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Saldo para o cálculo</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Saldo para o cálculo</label>
               <div class="relative">
                 <span class="absolute left-3 top-2 text-slate-400 font-bold">R$</span>
                 <input type="number" step="0.01" :value="r.saldoBase" @input="saldoManual = numero($event.target.value)" data-campo="saldo"
-                       class="w-full border rounded-lg p-2 pl-9 font-bold text-slate-800" :class="saldoManual !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-300'">
+                       class="w-full border rounded-lg p-2 pl-9 font-bold text-slate-800 border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" :class="saldoManual !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-300'">
               </div>
               <button v-if="r.ajuste" @click="saldoManual = null" class="text-[10px] font-bold text-amber-800 underline mt-0.5">desfazer ajuste (pede senha)</button>
             </div>
             <div v-if="r.pago > 0">
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Data do pagamento</label>
-              <input type="date" v-model="pagamento.data" :max="hoje" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-700 text-xs">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Data do pagamento</label>
+              <input type="date" v-model="pagamento.data" :max="hoje" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-700 text-xs focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
             </div>
           </div>
 
@@ -494,23 +494,23 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
 
           <div class="grid gap-3" :class="r.ajuste ? 'grid-cols-3' : 'grid-cols-1'">
             <div :class="r.ajuste ? 'col-span-2' : ''">
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Observação</label>
-              <input type="text" v-model="form.notes" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Motivo...">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Observação</label>
+              <input type="text" v-model="form.notes" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="Motivo...">
             </div>
             <div v-if="r.ajuste">
-              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Lock class="w-3 h-3"/> Sua senha</label>
-              <input type="password" v-model="form.senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg p-2">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1"><Lock class="w-3 h-3"/> Sua senha</label>
+              <input type="password" v-model="form.senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg p-2 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
             </div>
           </div>
         </div>
       </div>
 
-      <div class="p-4 bg-slate-50 flex justify-end gap-2 border-t border-slate-200">
+      <div class="px-6 py-4 bg-slate-50/70 flex justify-end gap-3 border-t border-slate-200">
         <button @click="salvarPdf" class="mr-auto px-4 py-2 border border-slate-300 bg-white text-slate-700 font-bold text-sm hover:bg-slate-100 rounded-lg flex items-center gap-2" data-campo="pdf">
           <FileDown class="w-4 h-4" /> Salvar PDF
         </button>
-        <button @click="$emit('close')" class="px-4 py-2 text-slate-600 font-bold text-sm hover:bg-slate-200 rounded-lg">Cancelar</button>
-        <button @click="salvar" :disabled="loading" class="px-5 py-2 bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 rounded-lg flex items-center gap-2 transition-colors shadow-md disabled:opacity-50">
+        <button @click="$emit('close')" class="px-4 py-2 text-sm rounded-lg bg-white border border-slate-300 text-slate-700 font-semibold shadow-xs hover:bg-slate-50">Cancelar</button>
+        <button @click="salvar" :disabled="loading" class="px-5 py-2 bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 rounded-lg flex items-center gap-2 transition-colors shadow-xs disabled:opacity-50">
           <Save v-if="!loading" class="w-4 h-4" />
           <Loader2 v-else class="w-4 h-4 animate-spin" />
           {{ loading ? 'Gravando...' : (prorrogar ? 'Confirmar prorrogação' : 'Registrar pagamento') }}

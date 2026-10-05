@@ -17,22 +17,38 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  CalendarClock
+  CalendarClock,
+  HandCoins
 } from 'lucide-vue-next';
 
 const route = useRoute();
 const isMobileSidebarOpen = ref(false);
 const isSidebarCollapsed = ref(false);  
 
-const navigation = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Titulos', path: '/cheques', icon: Banknote },
-  { name: 'Borderô', path: '/bordero', icon: Calculator },
-  { name: 'Clientes', path: '/clientes', icon: Users },
-  { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
-  { name: 'Histórico Mensal', path: '/historico', icon: CalendarClock },
-  { name: 'Auditoria', path: '/auditoria', icon: ShieldCheck }
+const secoes = [
+  { titulo: 'Operação', itens: [
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Títulos', path: '/cheques', icon: Banknote },
+    { name: 'Borderô', path: '/bordero', icon: Calculator },
+    { name: 'Clientes', path: '/clientes', icon: Users }
+  ] },
+  { titulo: 'Financeiro', itens: [
+    { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
+    { name: 'Vales', path: '/vales', icon: HandCoins },
+    { name: 'Histórico Mensal', path: '/historico', icon: CalendarClock }
+  ] },
+  { titulo: 'Controle', itens: [
+    { name: 'Auditoria', path: '/auditoria', icon: ShieldCheck },
+    { name: 'Ajustes', path: '/configuracoes', icon: Settings }
+  ] }
 ];
+const navigation = secoes.flatMap(s => s.itens);
+// /clientes/12 tambem acende "Clientes"
+const ativo = (path) => route.path === path || (path !== '/' && route.path.startsWith(path + '/'));
+
+let usuario = {};
+try { usuario = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { usuario = {}; }
+const iniciais = (usuario.name || '?').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 
 const toggleMobileSidebar = () => {
   isMobileSidebarOpen.value = !isMobileSidebarOpen.value;
@@ -60,136 +76,130 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="flex h-screen bg-slate-50 overflow-hidden font-sans">
-    
-    <aside 
-      class="hidden md:flex flex-col bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white transition-all duration-300 ease-in-out fixed h-full z-50 border-r border-slate-800/80"
-      :class="isSidebarCollapsed ? 'w-20' : 'w-64'"
+  <div class="flex h-screen app-bg overflow-hidden font-sans">
+
+    <aside
+      class="hidden md:flex flex-col bg-white transition-[width] duration-200 ease-in-out fixed h-full z-50 border-r border-slate-200/80"
+      :class="isSidebarCollapsed ? 'w-[68px]' : 'w-64'"
     >
-      <div class="h-16 flex items-center px-4 border-b border-slate-800 transition-all" :class="isSidebarCollapsed ? 'justify-center' : 'justify-between'">
+      <div class="h-16 flex items-center px-4 flex-shrink-0" :class="isSidebarCollapsed ? 'justify-center px-0' : ''">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="bg-gradient-to-br from-indigo-500 to-indigo-700 p-2 rounded-xl text-white shadow-lg shadow-indigo-900/40 flex-shrink-0">
-            <Wallet class="w-6 h-6" />
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-inset ring-white/15">
+            <Wallet class="w-[18px] h-[18px]" />
           </div>
-          
-          <div v-show="!isSidebarCollapsed" class="whitespace-nowrap transition-opacity duration-300">
-            <h1 class="text-lg font-bold tracking-wide">Fozesc</h1>
-            <p class="text-[10px] text-slate-400 uppercase tracking-widest">Management</p>
+          <div v-show="!isSidebarCollapsed" class="whitespace-nowrap leading-tight">
+            <h1 class="text-[15px] font-semibold text-slate-900">Fozesc</h1>
+            <p class="text-xs text-slate-500">Gestão de recebíveis</p>
           </div>
         </div>
       </div>
 
-      <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-        <router-link 
-          v-for="item in navigation" 
-          :key="item.name" 
-          :to="item.path"
-          class="flex items-center px-3 py-3 rounded-xl transition-all group relative"
-          :class="route.path === item.path 
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' 
-            : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'"
-          :title="isSidebarCollapsed ? item.name : ''"
-        >
-          <span v-if="route.path === item.path"
-                class="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-white/80"></span>
-
-          <component 
-            :is="item.icon" 
-            class="w-5 h-5 transition-transform group-hover:scale-110 flex-shrink-0" 
-            :class="isSidebarCollapsed ? 'mx-auto' : 'mr-3'"
-          />
-          
-          <span v-show="!isSidebarCollapsed" class="font-bold text-sm whitespace-nowrap">
-            {{ item.name }}
-          </span>
-
-          <div v-if="isSidebarCollapsed" class="absolute left-14 bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
-            {{ item.name }}
+      <nav class="flex-1 overflow-y-auto px-3 pb-3">
+        <div v-for="secao in secoes" :key="secao.titulo" class="mt-3 first:mt-1">
+          <div v-if="!isSidebarCollapsed" class="px-3 pb-1.5 pt-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">{{ secao.titulo }}</div>
+          <div v-else class="mx-2 my-3 border-t border-slate-100"></div>
+          <div class="space-y-0.5">
+            <router-link
+              v-for="item in secao.itens"
+              :key="item.name"
+              :to="item.path"
+              class="flex items-center h-9 px-3 rounded-lg transition-colors group relative"
+              :class="ativo(item.path)
+                ? 'bg-indigo-50 text-indigo-700'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+              :title="isSidebarCollapsed ? item.name : ''"
+            >
+              <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0 transition-colors"
+                         :class="[isSidebarCollapsed ? 'mx-auto' : 'mr-3', ativo(item.path) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600']" />
+              <span v-show="!isSidebarCollapsed" class="text-sm font-medium whitespace-nowrap">{{ item.name }}</span>
+              <div v-if="isSidebarCollapsed" class="absolute left-14 bg-slate-900 text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
+                {{ item.name }}
+              </div>
+            </router-link>
           </div>
-        </router-link>
+        </div>
       </nav>
 
-      <div class="p-4 border-t border-slate-800 flex flex-col gap-2">
-        <button 
-          @click="toggleDesktopSidebar"
-          class="w-full flex items-center justify-center p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-        >
-          <ChevronRight v-if="isSidebarCollapsed" class="w-5 h-5" />
-          <ChevronLeft v-else class="w-5 h-5" />
-        </button>
-
-        <div class="pt-2 border-t border-slate-800 mt-2">
-          <router-link to="/configuracoes" class="flex items-center px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800 transition-colors mb-1" :class="isSidebarCollapsed ? 'justify-center' : ''">
-            <Settings class="w-5 h-5" :class="!isSidebarCollapsed ? 'mr-3' : ''" />
-            <span v-show="!isSidebarCollapsed" class="text-sm font-bold">Ajustes</span>
-          </router-link>
-          
-          <button 
-            type="button"
-            @click="handleLogout" 
-            class="w-full flex items-center px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors cursor-pointer" 
-            :class="isSidebarCollapsed ? 'justify-center' : ''"
-          >
-            <LogOut class="w-5 h-5 flex-shrink-0" :class="!isSidebarCollapsed ? 'mr-3' : ''" />
-            <span v-show="!isSidebarCollapsed" class="text-sm font-bold">Sair</span>
+      <div class="p-3 flex-shrink-0 border-t border-slate-100">
+        <div class="flex items-center gap-3 rounded-xl p-2" :class="isSidebarCollapsed ? 'justify-center' : 'bg-slate-50 ring-1 ring-inset ring-slate-200/70'">
+          <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center flex-shrink-0" :title="usuario.name">{{ iniciais }}</div>
+          <div v-show="!isSidebarCollapsed" class="min-w-0 flex-1 leading-tight">
+            <div class="text-[13px] font-semibold text-slate-800 truncate">{{ usuario.name || 'Usuário' }}</div>
+            <div class="text-xs text-slate-500 truncate">{{ usuario.role || '' }}</div>
+          </div>
+          <button v-show="!isSidebarCollapsed" type="button" @click="handleLogout" title="Sair do sistema"
+                  class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-xs transition-colors">
+            <LogOut class="w-4 h-4" />
           </button>
-          <p class="mt-2 text-[10px] text-slate-600 tabular-nums select-none" :class="isSidebarCollapsed ? 'text-center' : 'px-3'"
-             title="Versão do sistema">{{ isSidebarCollapsed ? 'v' + VERSAO : 'Versão ' + VERSAO }}</p>
+        </div>
+        <button v-if="isSidebarCollapsed" type="button" @click="handleLogout" title="Sair do sistema"
+                class="w-full flex justify-center p-2 mt-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+          <LogOut class="w-4 h-4" />
+        </button>
+        <div class="flex items-center justify-between px-1 pt-2" :class="isSidebarCollapsed ? 'flex-col gap-1' : ''">
+          <span class="text-[11px] text-slate-400 tabular-nums select-none" title="Versão do sistema">{{ isSidebarCollapsed ? 'v' + VERSAO : 'Versão ' + VERSAO }}</span>
+          <button @click="toggleDesktopSidebar" :title="isSidebarCollapsed ? 'Expandir menu' : 'Recolher menu'"
+                  class="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+            <ChevronRight v-if="isSidebarCollapsed" class="w-4 h-4" />
+            <ChevronLeft v-else class="w-4 h-4" />
+          </button>
         </div>
       </div>
     </aside>
 
     <div v-if="isMobileSidebarOpen" class="fixed inset-0 z-40 md:hidden">
-      <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" @click="toggleMobileSidebar"></div>
-      <div class="relative flex-1 flex flex-col max-w-xs w-full bg-slate-900 h-full shadow-xl">
+      <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="toggleMobileSidebar"></div>
+      <div class="relative flex-1 flex flex-col max-w-xs w-full bg-white h-full shadow-2xl">
         <div class="absolute top-0 right-0 -mr-12 pt-2">
           <button @click="toggleMobileSidebar" class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
             <X class="h-6 w-6 text-white" />
           </button>
         </div>
         <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-          <div class="flex-shrink-0 flex items-center px-4 mb-8">
-            <Wallet class="w-8 h-8 text-indigo-500 mr-3" />
-            <h1 class="text-2xl font-bold text-white">Fozesc</h1>
+          <div class="flex-shrink-0 flex items-center gap-3 px-5 mb-6">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-sm">
+              <Wallet class="w-[18px] h-[18px]" />
+            </div>
+            <h1 class="text-lg font-semibold text-slate-900">Fozesc</h1>
           </div>
-          <nav class="px-2 space-y-1">
-            <router-link 
-              v-for="item in navigation" 
-              :key="item.name" 
+          <nav class="px-3 space-y-0.5">
+            <router-link
+              v-for="item in navigation"
+              :key="item.name"
               :to="item.path"
               @click="toggleMobileSidebar"
-              class="group flex items-center px-2 py-3 text-base font-medium rounded-md text-slate-300 hover:bg-slate-800 hover:text-white"
-              :class="route.path === item.path ? 'bg-slate-800 text-white' : ''"
+              class="group flex items-center px-3 py-2.5 text-[15px] font-medium rounded-lg"
+              :class="ativo(item.path) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
             >
-              <component :is="item.icon" class="mr-4 h-6 w-6 text-slate-400 group-hover:text-white" />
+              <component :is="item.icon" class="mr-3 h-5 w-5" :class="ativo(item.path) ? 'text-indigo-600' : 'text-slate-400'" />
               {{ item.name }}
             </router-link>
-            
-            <button 
+
+            <button
               @click="handleLogout"
-              class="w-full group flex items-center px-2 py-3 text-base font-medium rounded-md text-red-400 hover:bg-red-900/20"
+              class="w-full group flex items-center px-3 py-2.5 text-[15px] font-medium rounded-lg text-red-600 hover:bg-red-50"
             >
-              <LogOut class="mr-4 h-6 w-6 text-red-400" />
+              <LogOut class="mr-3 h-5 w-5" />
               Sair do Sistema
             </button>
           </nav>
-          <p class="px-4 mt-6 text-[10px] text-slate-600 tabular-nums">Versão {{ VERSAO }}</p>
+          <p class="px-5 mt-6 text-[11px] text-slate-400 tabular-nums">Versão {{ VERSAO }}</p>
         </div>
       </div>
     </div>
 
-    <div 
-      class="flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out"
-      :class="isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'"
+    <div
+      class="flex-1 flex flex-col h-screen overflow-hidden transition-[padding] duration-200 ease-in-out"
+      :class="isSidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-64'"
     >
       <div class="md:hidden absolute top-3 left-3 z-20">
         <button @click="toggleMobileSidebar" aria-label="Abrir menu"
-                class="p-2 rounded-xl text-slate-600 hover:text-slate-900 bg-white/90 backdrop-blur shadow-sm border border-slate-200">
+                class="p-2 rounded-lg text-slate-600 hover:text-slate-900 bg-white shadow-sm ring-1 ring-slate-200">
           <Menu class="h-5 w-5" />
         </button>
       </div>
 
-      <main class="flex-1 overflow-y-auto app-bg p-4 md:p-8 pt-14 md:pt-8">
+      <main class="flex-1 overflow-y-auto app-bg p-4 md:px-8 md:py-7 pt-14 md:pt-7">
         <div class="max-w-7xl mx-auto pb-20">
           <slot></slot>
         </div>

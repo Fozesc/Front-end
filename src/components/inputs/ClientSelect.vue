@@ -96,15 +96,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="relative" ref="containerRef">
-    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente</label>
+    <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Cliente</label>
     
     <div 
       @click="toggleOpen"
-      class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors h-[42px]"
-      :class="{'ring-2 ring-indigo-100 border-indigo-500': isOpen}"
+      class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 flex justify-between items-center cursor-pointer hover:border-slate-400 shadow-xs transition-all h-[42px]"
+      :class="{'ring-4 ring-indigo-500/15 border-indigo-500 hover:border-indigo-500': isOpen}"
     >
-      <div v-if="selectedLabel" class="flex items-center gap-2 font-bold text-slate-800">
-        <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">
+      <div v-if="selectedLabel" class="flex items-center gap-2 font-medium text-slate-900 text-sm">
+        <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-semibold">
           {{ selectedLabel.charAt(0) }}
         </div>
         {{ selectedLabel }}
@@ -112,16 +112,16 @@ onBeforeUnmount(() => {
       <div v-else class="text-slate-400 text-sm">Selecione um cliente...</div>
 
       <div class="flex items-center gap-1">
-        <button v-if="selectedLabel" @click="clearSelection" class="p-1 hover:bg-slate-200 rounded-full text-slate-400">
+        <button v-if="selectedLabel" @click="clearSelection" class="p-1 hover:bg-slate-100 rounded-md text-slate-400">
           <X class="w-3 h-3" />
         </button>
         <ChevronDown class="w-4 h-4 text-slate-400 transition-transform" :class="{'rotate-180': isOpen}" />
       </div>
     </div>
 
-    <div v-if="isOpen" class="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+    <div v-if="isOpen" class="absolute left-0 top-full mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
       
-      <div class="p-2 border-b border-slate-100 bg-slate-50">
+      <div class="p-2 border-b border-slate-100">
         <div class="relative">
           <Search class="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
           <input 
@@ -129,7 +129,7 @@ onBeforeUnmount(() => {
             v-model="searchTerm" 
             @input="onInput"
             placeholder="Digite para buscar..." 
-            class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-indigo-500"
+            class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow"
             autocomplete="off"
           />
           <div v-if="loading" class="absolute right-3 top-2.5">
@@ -147,16 +147,16 @@ onBeforeUnmount(() => {
           v-for="client in options" 
           :key="client.id"
           @click="selectOption(client)"
-          class="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors group"
+          class="flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors group"
           :class="{'bg-indigo-50': modelValue === client.id}"
         >
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 flex items-center justify-center font-bold text-xs transition-colors">
+            <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-700 flex items-center justify-center font-semibold text-xs transition-colors">
               {{ client.name.charAt(0) }}
             </div>
             <div>
-              <div class="text-sm font-bold text-slate-700 group-hover:text-indigo-900">{{ client.name }}</div>
-              <div class="text-[10px] text-slate-400">{{ client.document || 'Sem documento' }}</div>
+              <div class="text-sm font-medium text-slate-800">{{ client.name }}</div>
+              <div class="text-xs text-slate-500">{{ client.document || 'Sem documento' }}</div>
             </div>
           </div>
           <Check v-if="modelValue === client.id" class="w-4 h-4 text-indigo-600" />
