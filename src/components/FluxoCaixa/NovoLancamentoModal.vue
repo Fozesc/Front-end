@@ -57,12 +57,12 @@ const salvar = () => {
     
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
       
-      <div class="bg-slate-900 px-6 py-4 flex justify-between items-center">
-        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+      <div class="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+        <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
           <span v-if="isEdicao">Editar Lançamento</span>
           <span v-else>Novo Lançamento</span>
         </h2>
-        <button @click="$emit('close')" class="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"><X class="w-5 h-5" /></button>
+        <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors"><X class="w-5 h-5" /></button>
       </div>
 
       <div class="p-6 space-y-5">
@@ -77,23 +77,23 @@ const salvar = () => {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
-          <input v-model="form.descricao" type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Pagamento Fornecedor" />
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Descrição</label>
+          <input v-model="form.descricao" type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="Ex: Pagamento Fornecedor" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Valor (R$)</label>
-            <input v-model="form.valor" type="number" step="0.01" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" placeholder="0,00" />
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Valor (R$)</label>
+            <input v-model="form.valor" type="number" step="0.01" class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none font-bold text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="0,00" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
+            <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Data</label>
             <BaseDateInput v-model="form.data" />
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Conta / Origem</label>
+          <label class="block text-[13px] font-medium text-slate-700 mb-2">Conta / Origem</label>
           <div class="grid grid-cols-3 gap-2">
             <button @click="form.origem = 'Dinheiro'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Dinheiro' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
               <Wallet class="w-5 h-5" /> Dinheiro
@@ -108,9 +108,9 @@ const salvar = () => {
         </div>
       </div>
 
-      <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
-        <button @click="$emit('close')" class="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg">Cancelar</button>
-        <button @click="salvar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center">
+      <div class="bg-slate-50/70 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+        <button @click="$emit('close')" class="px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 font-semibold shadow-xs hover:bg-slate-50 text-sm">Cancelar</button>
+        <button @click="salvar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold shadow-xs flex items-center text-sm">
           <Save class="w-4 h-4 mr-2" /> {{ isEdicao ? 'Salvar Alterações' : 'Adicionar' }}
         </button>
       </div>

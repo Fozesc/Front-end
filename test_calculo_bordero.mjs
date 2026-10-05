@@ -2,7 +2,7 @@
 // Rode:  node test_calculo_bordero.mjs
 import assert from 'node:assert/strict';
 import {
-  arredondar, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao
+  arredondar, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao, calcularImposto
 } from './src/utils/calculoBordero.js';
 
 const IOF = { iofEnabled: true, iofBase: 0.38, iofDiario: 0.0082 };
@@ -85,6 +85,32 @@ for (let i = 0; i < 20000; i++) {
   assert.ok(Math.abs(liquido - saldo) <= 0.011 + saldo * 1e-12, `${saldo} ${dias} ${taxaMensal} -> ${liquido}`);
 }
 
+// 12. Imposto do Receber = juros do Borderô Bruto sobre o valor devido (+ IOF do borderô)
+const atraso = { valor: 2500, dataBase: '2026-09-12', dataPagamento: '2026-10-02', taxaMensal: 5, diasCompensacao: 0, ...IOF };
+const imp = calcularImposto(atraso);
+const comoBordero = calcularLinha({ valor: 2500, dias: 20, taxaMensal: 5, ...IOF });
+assert.deepEqual(imp, { dias: 20, juros: comoBordero.juros, iof: comoBordero.iof, encargos: arredondar(comoBordero.juros + comoBordero.iof) });
+assert.equal(imp.juros, arredondar(2500 * (Math.pow(1.05, 20 / 30) - 1)));
+//     atraso longo (o caso da promissoria de 28/04/2023): calcula, sem quebrar nem explodir
+const longo2 = calcularImposto({ ...atraso, valor: 900, dataBase: '2023-04-28' });
+assert.equal(longo2.dias, 1253);
+assert.equal(longo2.juros, arredondar(900 * (Math.pow(1.05, 1253 / 30) - 1)));
+//     o IOF diario para em 365 dias
+assert.equal(longo2.iof, calcularLinha({ valor: 900, dias: 365, taxaMensal: 5, ...IOF }).iof);
+assert.equal(calcularImposto({ ...atraso, iofEnabled: false }).iof, 0);
+//     pago em dia ou adiantado: nao ha dias, o calculo da zero (ele digita se quiser cobrar)
+for (const dataPagamento of ['2026-09-12', '2026-09-01']) {
+  const z = calcularImposto({ ...atraso, dataPagamento });
+  assert.deepEqual([z.juros, z.iof, z.encargos], [0, 0, 0]);
+}
+//     sempre cresce com o prazo (a conta inversa explodia perto de 1 ano)
+let anterior = 0;
+for (let d = 1; d <= 2000; d += 7) {
+  const r = calcularImposto({ ...atraso, dataBase: '2020-01-01', dataPagamento: new Date(Date.UTC(2020, 0, 1 + d)).toISOString().slice(0, 10) });
+  assert.ok(r.encargos >= anterior, `prazo ${d}`);
+  anterior = r.encargos;
+}
+
 console.log('OK: juros da prorrogação pelo Borderô de Líquido (Inverso) sobre o saldo, padrão = paga os juros ' +
             '(valor devido igual), pagamento quita juros antes de abater, menos que os juros soma no saldo, ' +
-            'sem prorrogar, ajuste manual, taxa/IOF e prazo inválido.');
+            'sem prorrogar, ajuste manual, taxa/IOF, prazo inválido e imposto do Receber.');

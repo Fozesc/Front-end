@@ -142,42 +142,46 @@ const formatPct = (p) => `${p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)}%`;
 const RX_PARTE = /\s*\(Parte (\d+)\/(\d+)(?: · ([^)]+))?\)\s*$/;
 
 const linhas = computed(() => {
-  const porCheque = {};
-  for (const l of lancamentos.value) {
-    if (l.check_id) (porCheque[l.check_id] ||= []).push(l);
-  }
-
+  // um recebimento dividido = linhas do mesmo cheque, no mesmo dia, com "(Parte i/n)".
+  // Com imposto a parte pode ter 2 linhas (imposto + titulo), entao nao da para contar
+  // linhas: o grupo esta completo quando aparecem as partes 1..n.
+  const grupos = {};
   const linhasFinais = lancamentos.value.map((l) => {
-    const info = RX_PARTE.exec(l.descricao || '');
+    const info = l.check_id ? RX_PARTE.exec(l.descricao || '') : null;
     if (!info) return { ...l, descricaoLimpa: l.descricao, parte: 0 };
-
-    const grupo = porCheque[l.check_id] || [];
-    const completo = grupo.length === Number(info[2]);
-    const totalCheque = completo ? grupo.reduce((t, x) => t + Math.abs(x.valor || 0), 0) : 0;
-
-    return {
+    const linha = {
       ...l,
       descricaoLimpa: (l.descricao || '').replace(RX_PARTE, ''),
       parte: Number(info[1]),
       partes: Number(info[2]),
       forma: info[3] || '',
-      totalCheque,
-      pct: totalCheque ? (Math.abs(l.valor || 0) / totalCheque) * 100 : 0,
-      primeiraDoGrupo: completo && Number(info[1]) === 1
+      grupo: `${l.check_id}|${l.data}|${info[2]}`
     };
+    (grupos[linha.grupo] ||= []).push(linha);
+    return linha;
   });
 
-  // a lista vem do mais novo para o mais velho (id desc), o que colocava a parte 2
-  // acima da parte 1. Dentro do bloco do mesmo cheque, inverte para ler 1, 2, 3...
-  for (const grupo of Object.values(porCheque)) {
-    if (grupo.length < 2) continue;
-    const posicoes = grupo
-      .map(l => linhasFinais.findIndex(x => x.id === l.id))
-      .sort((a, b) => a - b);
-    const ordenadas = posicoes.map(i => linhasFinais[i]).sort((a, b) => a.parte - b.parte);
+  for (const grupo of Object.values(grupos)) {
+    const completo = new Set(grupo.map(l => l.parte)).size === grupo[0].partes;
+    const totalCheque = completo ? grupo.reduce((t, x) => t + Math.abs(x.valor || 0), 0) : 0;
+    for (const l of grupo) {
+      l.totalCheque = totalCheque;
+      l.pct = totalCheque ? (Math.abs(l.valor || 0) / totalCheque) * 100 : 0;
+    }
+    // a lista vem do mais novo para o mais velho (id desc), o que colocava a parte 2
+    // acima da parte 1. Dentro do bloco, reordena para ler 1, 2, 3...
+    const posicoes = grupo.map(l => linhasFinais.indexOf(l)).sort((a, b) => a - b);
+    const ordenadas = [...grupo].sort((a, b) => a.parte - b.parte);
     posicoes.forEach((pos, i) => { linhasFinais[pos] = ordenadas[i]; });
   }
 
+  // a data aparece so na primeira linha de cada bloco
+  const vistos = new Set();
+  for (const l of linhasFinais) {
+    if (!l.parte) continue;
+    l.primeiraDoGrupo = !vistos.has(l.grupo);
+    vistos.add(l.grupo);
+  }
   return linhasFinais;
 });
 </script>
@@ -191,19 +195,19 @@ const linhas = computed(() => {
     <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10 p-6 animate-scale-in">
-        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 text-red-600 mb-5">
-          <AlertTriangle class="h-8 w-8" />
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 text-red-600 mb-4">
+          <AlertTriangle class="h-6 w-6" />
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-2 text-center">Apagar lançamento do caixa</h3>
+        <h3 class="text-lg font-semibold text-slate-900 mb-1 text-center">Apagar lançamento do caixa</h3>
         <p class="text-slate-500 mb-4 text-sm leading-relaxed text-center">
           O saldo muda na hora e <strong class="text-slate-700">não há como desfazer</strong>.
         </p>
 
         <div v-if="confirmModal.item" class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 text-sm">
-          <div class="font-bold text-slate-800">{{ confirmModal.item.descricao }}</div>
+          <div class="font-semibold text-slate-800">{{ confirmModal.item.descricao }}</div>
           <div class="flex justify-between mt-1 text-slate-500 text-xs">
             <span>{{ formatDate(confirmModal.item.data) }} · {{ confirmModal.item.origem }}</span>
-            <span class="font-bold" :class="confirmModal.item.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-600'">
+            <span class="font-semibold tabular-nums" :class="confirmModal.item.tipo === 'entrada' ? 'text-emerald-600' : 'text-red-600'">
               {{ confirmModal.item.tipo === 'entrada' ? '+' : '-' }} {{ formatMoney(confirmModal.item.valor) }}
             </span>
           </div>
@@ -213,99 +217,101 @@ const linhas = computed(() => {
           <AlertTriangle class="w-4 h-4 mt-0.5 shrink-0" /> {{ vinculoDoLancamento }}
         </p>
 
-        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sua senha</label>
+        <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Sua senha</label>
         <input
           v-model="confirmModal.senha"
           type="password"
           autocomplete="current-password"
           placeholder="Digite sua senha para confirmar"
-          class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 text-sm mb-2"
+          class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg outline-none text-sm mb-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15 shadow-xs transition-shadow"
           @keyup.enter="confirmarExclusao"
         />
-        <p v-if="confirmModal.erro" class="text-xs text-red-600 font-bold mb-2">{{ confirmModal.erro }}</p>
+        <p v-if="confirmModal.erro" class="text-xs text-red-600 font-medium mb-2">{{ confirmModal.erro }}</p>
 
         <div class="flex gap-3 mt-4">
-          <button @click="confirmModal.visible = false" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm">
+          <button @click="confirmModal.visible = false" class="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg shadow-xs hover:bg-slate-50 transition-colors text-sm">
             Cancelar
           </button>
           <button @click="confirmarExclusao" :disabled="confirmModal.salvando"
-                  class="flex-1 px-4 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 disabled:opacity-60 transition-colors shadow-lg shadow-red-200 text-sm">
+                  class="flex-1 px-4 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 disabled:opacity-60 transition-colors shadow-xs text-sm">
             {{ confirmModal.salvando ? 'Apagando...' : 'Sim, apagar' }}
           </button>
         </div>
       </div>
     </div>
 
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-      <h1 class="text-3xl font-bold text-slate-900">Fluxo de Caixa</h1>
-      <div class="flex gap-3">
-        <button @click="showConfigModal = true" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1">
-          <Settings class="w-4 h-4" /> Capital Social
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Fluxo de Caixa</h1>
+        <p class="text-slate-500 text-sm mt-1">Saldos por conta, dinheiro na rua e lançamentos.</p>
+      </div>
+      <div class="flex gap-2.5">
+        <button @click="showConfigModal = true" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
+          <Settings class="w-4 h-4 text-slate-500" /> Capital social
         </button>
-        <button @click="abrirModalNovo" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-md flex items-center text-sm transition-transform active:scale-95">
+        <button @click="abrirModalNovo" class="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-all active:scale-[0.98]">
           <Plus class="w-4 h-4 mr-2" /> Lançamento
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <div class="flex items-center gap-3 mb-4 text-slate-700"><Building class="w-5 h-5" /> <span class="text-xs font-bold uppercase tracking-wider">Saldo Atual (No Caixa)</span></div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
+        <div class="flex items-center gap-3 mb-4"><span class="w-9 h-9 rounded-lg bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200 flex items-center justify-center"><Building class="w-[18px] h-[18px]" /></span><div class="leading-tight"><div class="text-sm font-semibold text-slate-900">Saldo atual</div><div class="text-xs text-slate-500">no caixa, por conta</div></div></div>
         <div class="space-y-2">
-          <div class="flex justify-between items-center"><span class="text-xs text-blue-600 font-bold uppercase">BB</span><span class="text-sm font-bold text-slate-700">{{ formatMoney(saldos.bruto.bb_total) }}</span></div>
-          <div class="flex justify-between items-center"><span class="text-xs text-sky-500 font-bold uppercase">Caixa</span><span class="text-sm font-bold text-slate-700">{{ formatMoney(saldos.bruto.caixa_total) }}</span></div>
-          <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-1"><span class="text-xs text-emerald-600 font-bold uppercase">Dinheiro</span><span class="text-sm font-bold text-slate-700">{{ formatMoney(saldos.bruto.dinheiro_total) }}</span></div>
-          <div class="flex justify-between items-center pt-1 font-black text-slate-900 uppercase text-[10px]"><span>Total Caixa:</span><span>{{ formatMoney(totalBrutoGeral) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-blue-500"></span>BB</span><span class="font-semibold text-slate-800 tabular-nums">{{ formatMoney(saldos.bruto.bb_total) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-sky-400"></span>Caixa</span><span class="font-semibold text-slate-800 tabular-nums">{{ formatMoney(saldos.bruto.caixa_total) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Dinheiro</span><span class="font-semibold text-slate-800 tabular-nums">{{ formatMoney(saldos.bruto.dinheiro_total) }}</span></div>
+          <div class="flex justify-between items-center border-t border-slate-100 pt-3 mt-1"><span class="text-sm font-medium text-slate-500">Total no caixa</span><span class="text-base font-semibold text-slate-900 tracking-tight tabular-nums">{{ formatMoney(totalBrutoGeral) }}</span></div>
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <div class="flex items-center gap-3 mb-4 text-red-600"><ArrowDownCircle class="w-5 h-5" /> <span class="text-xs font-bold uppercase tracking-wider">Emprestado (Na Rua)</span></div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
+        <div class="flex items-center gap-3 mb-4"><span class="w-9 h-9 rounded-lg bg-red-50 text-red-600 ring-1 ring-inset ring-red-100 flex items-center justify-center"><ArrowDownCircle class="w-[18px] h-[18px]" /></span><div class="leading-tight"><div class="text-sm font-semibold text-slate-900">Emprestado</div><div class="text-xs text-slate-500">na rua, por origem</div></div></div>
         <div class="space-y-2">
-          <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Origem BB</span><span class="text-sm font-bold text-red-600">{{ formatMoney(saldos.na_rua.BRASIL) }}</span></div>
-          <div class="flex justify-between items-center"><span class="text-xs text-slate-500 font-bold uppercase">Origem Caixa</span><span class="text-sm font-bold text-red-600">{{ formatMoney(saldos.na_rua.CAIXA) }}</span></div>
-          <div class="flex justify-between items-center border-t border-slate-100 pt-2 mt-1"><span class="text-xs text-slate-500 font-bold uppercase">Origem Dinheiro</span><span class="text-sm font-bold text-red-600">{{ formatMoney(saldos.na_rua.DINHEIRO) }}</span></div>
-          <div class="flex justify-between items-center pt-1 font-black text-red-800 uppercase text-[10px]"><span>Total:</span><span>{{ formatMoney(totalEmprestadoGeral) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-blue-500"></span>Origem BB</span><span class="font-semibold text-red-600 tabular-nums">{{ formatMoney(saldos.na_rua.BRASIL) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-sky-400"></span>Origem Caixa</span><span class="font-semibold text-red-600 tabular-nums">{{ formatMoney(saldos.na_rua.CAIXA) }}</span></div>
+          <div class="flex justify-between items-center text-sm"><span class="flex items-center gap-2 text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Origem Dinheiro</span><span class="font-semibold text-red-600 tabular-nums">{{ formatMoney(saldos.na_rua.DINHEIRO) }}</span></div>
+          <div class="flex justify-between items-center border-t border-slate-100 pt-3 mt-1"><span class="text-sm font-medium text-slate-500">Total emprestado</span><span class="text-base font-semibold text-red-700 tracking-tight tabular-nums">{{ formatMoney(totalEmprestadoGeral) }}</span></div>
         </div>
       </div>
 
-      <div class="bg-emerald-600 text-white p-5 rounded-xl shadow-lg relative overflow-hidden">
-        <div class="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4"><TrendingUp class="w-24 h-24" /></div>
-        <div class="flex items-center gap-3 mb-2 opacity-90"><Banknote class="w-5 h-5" /> <span class="text-xs font-bold uppercase tracking-wider">Patrimônio Total</span></div>
-        <div class="text-3xl font-black tracking-tight">{{ formatMoney(patrimonioAtual) }}</div>
-        <div class="mt-4 flex justify-between items-end border-t border-emerald-500 pt-3">
-          <div><span class="text-[10px] block opacity-70 uppercase font-bold text-emerald-100">Investido</span><span class="text-sm font-bold">{{ formatMoney(capitalTotal) }}</span></div>
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-xl shadow-md ring-1 ring-slate-900/5 relative overflow-hidden flex flex-col">
+        <div class="flex items-center gap-3 mb-4"><span class="w-9 h-9 rounded-lg bg-white/10 text-emerald-300 ring-1 ring-inset ring-white/10 flex items-center justify-center"><Banknote class="w-[18px] h-[18px]" /></span><div class="leading-tight"><div class="text-sm font-semibold">Patrimônio total</div><div class="text-xs text-slate-400">caixa + emprestado</div></div></div>
+        <div class="text-3xl font-semibold tracking-tight tabular-nums">{{ formatMoney(patrimonioAtual) }}</div>
+        <div class="mt-auto pt-4 flex justify-between items-end border-t border-white/10">
+          <div><span class="text-xs block text-slate-400">Investido</span><span class="text-sm font-semibold tabular-nums">{{ formatMoney(capitalTotal) }}</span></div>
           <div class="text-right">
-            <span class="text-[10px] block opacity-70 uppercase font-bold text-emerald-100">Crescimento</span>
-            <span class="text-sm font-bold bg-white/20 px-2 py-0.5 rounded-full">{{ porcentagemCrescimento > 0 ? '+' : '' }}{{ porcentagemCrescimento.toFixed(1) }}%</span>
+            <span class="text-xs block text-slate-400 mb-0.5">Crescimento</span>
+            <span class="text-sm font-semibold bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/20 px-2 py-0.5 rounded-md tabular-nums">{{ porcentagemCrescimento > 0 ? '+' : '' }}{{ porcentagemCrescimento.toFixed(1) }}%</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div class="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row gap-4 justify-between items-center">
         <div class="flex gap-3 w-full md:w-auto">
-          <input v-model="filtros.texto" type="text" placeholder="Buscar histórico..." class="w-full md:w-64 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input v-model="filtros.data" type="date" class="px-3 py-2 border rounded-lg text-sm outline-none" />
+          <input v-model="filtros.texto" type="text" placeholder="Buscar histórico..." class="w-full md:w-64 px-3 py-2 border rounded-lg text-sm outline-none border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
+          <input v-model="filtros.data" type="date" class="px-3 py-2 border rounded-lg text-sm outline-none border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
         </div>
-        <div v-if="!loading" class="flex gap-4 text-sm font-bold">
-          <div class="text-emerald-600 uppercase text-[10px] tracking-widest">Entradas: <span class="text-sm">{{ formatMoney(resumoFiltro.entradas) }}</span></div>
-          <div class="text-red-600 uppercase text-[10px] tracking-widest">Saídas: <span class="text-sm">{{ formatMoney(resumoFiltro.saidas) }}</span></div>
+        <div v-if="!loading" class="flex gap-5 text-sm">
+          <div class="text-slate-500">Entradas <span class="ml-1 font-semibold text-emerald-600 tabular-nums">{{ formatMoney(resumoFiltro.entradas) }}</span></div>
+          <div class="text-slate-500">Saídas <span class="ml-1 font-semibold text-red-600 tabular-nums">{{ formatMoney(resumoFiltro.saidas) }}</span></div>
         </div>
       </div>
 
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <thead class="bg-slate-50/80 text-slate-500 text-xs font-medium border-b border-slate-200">
             <tr>
-              <th class="px-6 py-4">Data</th>
-              <th class="px-6 py-4">Descrição</th>
-              <th class="px-6 py-4">Conta</th>
-              <th class="px-6 py-4 text-right">Entrada</th>
-              <th class="px-6 py-4 text-right">Saída</th>
-              <th class="px-6 py-4 text-right">Ações</th>
+              <th class="px-4 py-2.5">Data</th>
+              <th class="px-4 py-2.5">Descrição</th>
+              <th class="px-4 py-2.5">Conta</th>
+              <th class="px-4 py-2.5 text-right">Entrada</th>
+              <th class="px-4 py-2.5 text-right">Saída</th>
+              <th class="px-4 py-2.5 text-right">Ações</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -313,42 +319,42 @@ const linhas = computed(() => {
             <tr v-for="item in linhas" :key="item.id"
                 class="hover:bg-slate-50 transition-colors"
                 :class="item.parte ? 'bg-indigo-50/40' : ''">
-              <td class="px-6 py-4 text-slate-500 font-mono text-xs"
+              <td class="px-4 py-2.5 text-slate-500 tabular-nums text-[13px] whitespace-nowrap"
                   :class="item.parte ? 'border-l-[3px] border-indigo-400' : ''">
                 {{ item.parte && !item.primeiraDoGrupo ? '' : formatDate(item.data) }}
               </td>
-              <td class="px-6 py-4 font-medium text-slate-800">
+              <td class="px-4 py-2.5 font-medium text-slate-800">
                 <div class="flex items-center gap-2">
                   <Link2 v-if="item.parte" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"
                          title="Parte de um recebimento dividido (mesmo cheque)" />
                   <span>{{ item.descricaoLimpa }}</span>
                 </div>
-                <div v-if="item.parte" class="mt-1 flex items-center gap-2 text-[10px] font-bold">
-                  <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase tracking-tight">
+                <div v-if="item.parte" class="mt-1 flex items-center gap-2 text-[11px] font-medium">
+                  <span class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">
                     Parte {{ item.parte }}/{{ item.partes }}
                   </span>
-                  <span v-if="item.forma && item.forma !== item.origem" class="text-slate-500 uppercase">{{ item.forma }}</span>
+                  <span v-if="item.forma && item.forma !== item.origem" class="text-slate-500">{{ item.forma }}</span>
                   <span v-if="item.pct" class="text-slate-400">
                     {{ formatPct(item.pct) }} do cheque{{ item.totalCheque ? ' de ' + formatMoney(item.totalCheque) : '' }}
                   </span>
                 </div>
               </td>
-              <td class="px-6 py-4">
-                <span class="px-3 py-1 rounded text-[10px] font-bold border uppercase tracking-tighter whitespace-nowrap"
+              <td class="px-4 py-2.5">
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-medium border whitespace-nowrap"
                   :class="{
-                    'bg-blue-50 text-blue-700 border-blue-100': (item.origem || '').toLowerCase().includes('brasil') || (item.origem || '').toLowerCase().includes('bb'),
-                    'bg-sky-50 text-sky-700 border-sky-100': (item.origem || '').toLowerCase().includes('caixa') || (item.origem || '').toLowerCase().includes('ce'),
-                    'bg-emerald-50 text-emerald-700 border-emerald-100': !(item.origem || '').toLowerCase().includes('brasil') && !(item.origem || '').toLowerCase().includes('caixa')
+                    'bg-blue-50 text-blue-700 border-blue-200': (item.origem || '').toLowerCase().includes('brasil') || (item.origem || '').toLowerCase().includes('bb'),
+                    'bg-sky-50 text-sky-700 border-sky-200': (item.origem || '').toLowerCase().includes('caixa') || (item.origem || '').toLowerCase().includes('ce'),
+                    'bg-emerald-50 text-emerald-700 border-emerald-200': !(item.origem || '').toLowerCase().includes('brasil') && !(item.origem || '').toLowerCase().includes('caixa')
                   }">
                   {{ item.origem }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-right text-emerald-600 font-bold">{{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}</td>
-              <td class="px-6 py-4 text-right text-red-600 font-bold">{{ item.tipo === 'saida' ? formatMoney(item.valor) : '-' }}</td>
-              <td class="px-6 py-4 text-right">
-                <div class="flex justify-end gap-2 opacity-40 hover:opacity-100 transition-opacity">
-                  <button @click="abrirModalEdicao(item)" class="p-1 hover:text-indigo-600"><Edit2 class="w-4 h-4"/></button>
-                  <button @click="excluirLancamento(item)" class="p-1 hover:text-red-600"><Trash2 class="w-4 h-4"/></button>
+              <td class="px-4 py-2.5 text-right text-emerald-600 font-semibold tabular-nums whitespace-nowrap">{{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}</td>
+              <td class="px-4 py-2.5 text-right text-red-600 font-semibold tabular-nums whitespace-nowrap">{{ item.tipo === 'saida' ? formatMoney(item.valor) : '-' }}</td>
+              <td class="px-4 py-2.5 text-right">
+                <div class="flex justify-end gap-0.5">
+                  <button @click="abrirModalEdicao(item)" title="Editar" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Edit2 class="w-4 h-4"/></button>
+                  <button @click="excluirLancamento(item)" title="Apagar" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                 </div>
               </td>
             </tr>
@@ -356,17 +362,17 @@ const linhas = computed(() => {
         </table>
       </div>
 
-      <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
-        <span class="text-xs text-slate-500 font-bold">
+      <div class="px-5 py-3 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-[13px] text-slate-500">
           Página {{ currentPage }} de {{ totalPages || 1 }} · {{ totalItems }} lançamento(s)
         </span>
         <div class="flex gap-2">
           <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1"
-                  class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                  class="h-8 px-3 bg-white border border-slate-300 rounded-lg shadow-xs text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed">
             Anterior
           </button>
           <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage >= totalPages"
-                  class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
+                  class="h-8 px-3 bg-white border border-slate-300 rounded-lg shadow-xs text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed">
             Próxima
           </button>
         </div>

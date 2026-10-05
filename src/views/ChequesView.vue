@@ -7,13 +7,14 @@ import EditarChequeModal from '../components/layout/finance/EditarChequeModal.vu
 import ChequeDetalhesModal from '../components/layout/finance/ChequeDetalhesModal.vue';
 import ProrrogacaoModal from '../components/layout/finance/ProrrogacaoModal.vue'; 
 import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
+import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
 import api from '../services/api';
 
 import { 
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock, AlertTriangle, Archive, RotateCcw, Pencil,
+  Edit, Download, CalendarClock, AlertTriangle, Pencil,
   HandCoins
 } from 'lucide-vue-next';
 
@@ -33,12 +34,9 @@ const showEditModal = ref(false);
 // Cheque em recebimento. O modal proprio existe porque a baixa pode ser DIVIDIDA
 // (parte no dinheiro, parte no banco) - nao cabe no confirm generico.
 const chequeParaReceber = ref(null);
+// troca de status pelo botao da lista (Devolvido, Juridico...): { cheque, status }
+const mudancaStatus = ref(null);
 
-// Cheques marcados na tela para a acao em lote (tirar/devolver ao calculo).
-const selecionados = ref([]);
-// caixinhas so aparecem quando ele pede ("Selecionar"); "todos" = TODOS do filtro, nao so a pagina
-const modoSelecao = ref(false);
-const todosDoFiltro = ref(false);
 
 const openStatusMenuId = ref(null);
 const menuPosition = reactive({ top: 0, left: 0 });
@@ -64,10 +62,12 @@ const fetchSettings = async () => {
   }
 };
 
+const EM_ABERTO = ['Aguardando', 'Atrasado', 'Devolvido', 'Juridico'];
+
 const filters = reactive({
   search: '',
-  status: [], 
-  date_start: new Date().toLocaleDateString('en-CA'),
+  status: [...EM_ABERTO],
+  date_start: '',
   date_end: '',
   calculo: '',        // '' = todos | 'dentro' = so os que contam | 'fora' = so historico
   sort_by: 'due_date',
@@ -75,25 +75,22 @@ const filters = reactive({
 });
 
 const statusOptions = ['Aguardando', 'Pago', 'Atrasado', 'Devolvido', 'Juridico'];
-const statusFiltro = [...statusOptions, 'Prorrogado'];
+// o banco grava 'Juridico'; na tela vai com acento
+const rotuloStatus = (s) => (s === 'Juridico' ? 'Jurídico' : s);
 
 const confirmModal = reactive({
   visible: false,
   title: '',
   message: '',
   action: null,
-  type: 'danger',
-  showAccountSelect: false,
-  selectedAccount: 'Dinheiro'
+  type: 'danger'
 });
 
-const openConfirm = (title, message, actionCallback, type = 'danger', showAccount = false) => {
+const openConfirm = (title, message, actionCallback, type = 'danger') => {
   confirmModal.title = title;
   confirmModal.message = message;
   confirmModal.action = actionCallback;
   confirmModal.type = type;
-  confirmModal.showAccountSelect = showAccount;
-  confirmModal.selectedAccount = 'Dinheiro';
   confirmModal.visible = true;
 };
 
@@ -141,9 +138,13 @@ const toggleStatusFilter = (status) => {
   }
 };
 const isStatusSelected = (status) => filters.status.includes(status);
-const toggleAllStatus = () => {
-  filters.status = filters.status.length === statusFiltro.length ? [] : [...statusFiltro];
-};
+const rotuloFiltroStatus = computed(() => {
+  const s = filters.status;
+  if (!s.length || s.length === statusOptions.length) return 'Todos';
+  if (s.length === EM_ABERTO.length && EM_ABERTO.every(x => s.includes(x))) return 'Em aberto';
+  if (s.length === 1) return rotuloStatus(s[0]);
+  return `${s.length} selecionados`;
+});
 
 let timeoutSearch = null;
 watch(() => filters.search, () => {
@@ -153,11 +154,6 @@ watch(() => filters.search, () => {
     carregarDados();
   }, 400); 
 });
-
-const limparSelecao = () => { selecionados.value = []; todosDoFiltro.value = false; };
-
-watch([() => filters.search, () => filters.status, () => filters.date_start, () => filters.date_end, () => filters.calculo],
-      limparSelecao, { deep: true });
 
 watch([() => filters.status, () => filters.date_start, () => filters.date_end, () => filters.calculo], () => {
   currentPage.value = 1;
@@ -212,100 +208,9 @@ const alterarStatus = (cheque, novoStatus) => {
   closeGlobalMenus();
   if (cheque.status === novoStatus) return;
 
-  // receber tem tela propria (uma conta ou dividido em partes)
+  // receber tem tela propria (uma conta ou dividido em partes, com ou sem imposto)
   if (novoStatus === 'Pago') { abrirRecebimento(cheque); return; }
-
-  let title = `Alterar Status`;
-  let msg = `Tem certeza que deseja mudar o status para "${novoStatus}"?`;
-  let alertType = 'warning';
-  let requiresAccount = false;
-  let payloadData = {};
-
-  if (novoStatus === 'Devolvido') {
-    title = 'Confirmar Devolução';
-    const valorMultaCalculada = cheque.valor_bruto * (taxaMulta.value / 100);
-    msg = `A multa de ${formatCurrency(valorMultaCalculada)} entrará no caixa escolhido.`;
-    alertType = 'danger';
-    requiresAccount = true;
-    payloadData.taxa_multa = taxaMulta.value;
-  }
-
-  openConfirm(title, msg, async () => {
-    try {
-      if (requiresAccount) {
-        payloadData.method = confirmModal.selectedAccount; 
-      }
-
-      await api.patch(`/checks/${cheque.id}/status`, {
-          status: novoStatus,
-          taxa_multa: payloadData.taxa_multa, 
-          payment_data: payloadData 
-      });
-      
-      carregarDados();
-    } catch (error) { 
-      alert(error.response?.data?.error || "Erro ao atualizar o status."); 
-    }
-  }, alertType, requiresAccount);
-};
-
-// ---------------------------------------------------------------- SELECAO
-const qtdSelecionada = computed(() => (todosDoFiltro.value ? totalItems.value : selecionados.value.length));
-const isSelecionado = (id) => todosDoFiltro.value || selecionados.value.includes(id);
-const toggleSelecao = (id) => {
-  if (todosDoFiltro.value) {
-    // desmarcou um depois de "todos": vira selecao explicita da pagina sem ele
-    todosDoFiltro.value = false;
-    selecionados.value = dados.value.map(c => c.id).filter(x => x !== id);
-    return;
-  }
-  selecionados.value = isSelecionado(id)
-    ? selecionados.value.filter(x => x !== id)
-    : [...selecionados.value, id];
-};
-const toggleTodosDoFiltro = () => {
-  todosDoFiltro.value = !todosDoFiltro.value;
-  selecionados.value = [];
-};
-const sairDaSelecao = () => { modoSelecao.value = false; limparSelecao(); };
-
-// ------------------------------------------------- FORA DO CALCULO (LOTE)
-// Dois escopos: os cheques marcados na tela, ou TODOS os que batem com o filtro
-// atual (e' assim que "todos os do Juridico" vira um clique).
-const aplicarCalculo = (fora) => {
-  const usandoSelecao = !todosDoFiltro.value;
-  const quantos = qtdSelecionada.value;
-
-  if (!quantos) { alert('Marque os cheques ou clique em "todos do filtro".'); return; }
-
-  const acao = fora
-    ? 'TIRAR do cálculo (viram histórico: saem do lucro, da carteira, da inadimplência e do Histórico Mensal)'
-    : 'VOLTAR ao cálculo (passam a contar em todos os números do sistema)';
-
-  openConfirm(
-    fora ? 'Tirar do cálculo' : 'Voltar ao cálculo',
-    `${quantos} cheque(s) vão ${acao}. Nenhum dado é apagado — dá para desfazer clicando no botão oposto.`,
-    async () => {
-      try {
-        const payload = usandoSelecao
-          ? { fora, ids: selecionados.value }
-          : { fora, filtros: {
-                search: filters.search,
-                status: filters.status.join(','),
-                date_start: filters.date_start,
-                date_end: filters.date_end,
-                calculo: filters.calculo
-              } };
-        const r = await checkService.definirCalculo(payload);
-        limparSelecao();
-        await carregarDados();
-        alert(`${r.alterados} cheque(s) atualizado(s).`);
-      } catch (e) {
-        alert(e.response?.data?.error || 'Erro ao aplicar a alteração.');
-      }
-    },
-    fora ? 'warning' : 'success'
-  );
+  mudancaStatus.value = { cheque, status: novoStatus };
 };
 
 const abrirEdicaoCheque = (cheque) => {
@@ -320,14 +225,19 @@ const deletarCheque = (id) => {
 };
 
 const abrirDetalhes = (cheque) => { selectedCheque.value = cheque; showDetailsModal.value = true; };
+const hojeISO = new Date().toLocaleDateString('en-CA');
+// dias de atraso de quem ainda deve (o "Atrasado" da lista ja vem do backend)
+const atraso = (c) => {
+  if (c.status === 'Pago' || !c.vencimento || c.vencimento >= hojeISO) return 0;
+  return Math.round((new Date(hojeISO + 'T12:00:00') - new Date(c.vencimento + 'T12:00:00')) / 86400000);
+};
 const formatCurrency = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 const getStatusColor = (s) => {
-    if(s === 'Pago') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if(s === 'Atrasado') return 'bg-red-100 text-red-700 border-red-200';
-    if(s === 'Devolvido') return 'bg-orange-100 text-orange-700 border-orange-200';
-    if(s === 'Juridico') return 'bg-purple-100 text-purple-700 border-purple-200';
-    if(s === 'Prorrogado') return 'bg-amber-50 text-amber-700 border-amber-200';
+    if(s === 'Pago') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if(s === 'Atrasado') return 'bg-red-50 text-red-700 border-red-200';
+    if(s === 'Devolvido') return 'bg-orange-50 text-orange-700 border-orange-200';
+    if(s === 'Juridico') return 'bg-purple-50 text-purple-700 border-purple-200';
     return 'bg-blue-50 text-blue-700 border-blue-200';
 };
 
@@ -342,7 +252,7 @@ const toggleStatusMenu = (cheque, event) => {
 };
 
 const resetFilters = () => {
-    filters.search = ''; filters.status = []; filters.date_start = ''; filters.date_end = '';
+    filters.search = ''; filters.status = [...EM_ABERTO]; filters.date_start = ''; filters.date_end = '';
     filters.calculo = '';
     currentPage.value = 1; carregarDados();
 };
@@ -363,31 +273,24 @@ const exportarTela = () => {
     <ProrrogacaoModal v-if="showProrrogacaoModal" :cheque="chequeParaProrrogar" :isOpen="showProrrogacaoModal" @close="showProrrogacaoModal = false" @save="() => { showProrrogacaoModal = false; carregarDados(); }" />
     <RecebimentoModal v-if="chequeParaReceber" :cheque="chequeParaReceber"
                       @close="chequeParaReceber = null" @confirmado="carregarDados" />
+    <StatusChequeModal v-if="mudancaStatus" :cheque="mudancaStatus.cheque" :novoStatus="mudancaStatus.status"
+                       :taxaMulta="taxaMulta" @close="mudancaStatus = null" @confirmado="carregarDados" />
 
     <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 p-6 text-center animate-scale-in">
-        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6"
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"
              :class="confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : (confirmModal.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600')">
-          <AlertTriangle v-if="confirmModal.type !== 'success'" class="h-8 w-8" />
-          <CheckSquare v-else class="h-8 w-8" />
+          <AlertTriangle v-if="confirmModal.type !== 'success'" class="h-6 w-6" />
+          <CheckSquare v-else class="h-6 w-6" />
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-2">{{ confirmModal.title }}</h3>
-        <p class="text-slate-500 mb-2 text-sm">{{ confirmModal.message }}</p>
-        
-        <div v-if="confirmModal.showAccountSelect" class="mt-4 mb-6 text-left bg-slate-50 p-4 rounded-lg border border-slate-200">
-          <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Entrar na conta:</label>
-          <select v-model="confirmModal.selectedAccount" class="w-full bg-white border border-slate-300 rounded-lg py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700">
-            <option value="Dinheiro">Dinheiro (Cofre)</option>
-            <option value="BB">Banco do Brasil</option>
-            <option value="Caixa">Caixa Econômica</option>
-          </select>
-        </div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ confirmModal.title }}</h3>
+        <p class="text-slate-500 mb-6 text-sm">{{ confirmModal.message }}</p>
 
         <div class="flex gap-3 justify-center">
-          <button @click="confirmModal.visible = false" class="px-5 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors w-full text-sm">Cancelar</button>
+          <button @click="confirmModal.visible = false" class="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg shadow-xs hover:bg-slate-50 transition-colors w-full text-sm">Cancelar</button>
           <button @click="() => { confirmModal.action(); confirmModal.visible = false; }" 
-                  class="px-5 py-2.5 text-white font-bold rounded-lg shadow-md transition-colors w-full text-sm"
+                  class="px-4 py-2.5 text-white font-semibold rounded-lg shadow-xs transition-colors w-full text-sm"
                   :class="confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : (confirmModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600')">
             Confirmar
           </button>
@@ -398,156 +301,133 @@ const exportarTela = () => {
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Gerenciamento de Cheques</h1>
-          <div class="text-slate-500 text-sm mt-1">Total: <strong>{{ totalItems }}</strong> registros</div>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Títulos</h1>
+          <div class="text-slate-500 text-sm mt-1">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> registros</div>
         </div>
-        <div class="flex gap-3">
-          <button @click="exportarTela" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm hover:bg-slate-50">
-            <Download class="w-4 h-4 mr-2" /> Exportar
+        <div class="flex gap-2.5">
+          <button @click="exportarTela" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
+            <Download class="w-4 h-4 mr-2 text-slate-500" /> Exportar
           </button>
-          <button @click="router.push('/bordero')" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center">
-            <Calculator class="w-4 h-4 mr-2"/> Novo Borderô
+          <button @click="router.push('/bordero')" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
+            <Calculator class="w-4 h-4 mr-2 text-slate-500"/> Novo borderô
           </button>
-          <button @click="abrirNovo" class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-md">
-            <Plus class="w-4 h-4 mr-2"/> Novo Cheque
+          <button @click="abrirNovo" class="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs ring-1 ring-inset ring-white/10 transition-colors">
+            <Plus class="w-4 h-4 mr-2"/> Novo cheque
           </button>
         </div>
       </div>
 
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 mb-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
         <div class="md:col-span-3 relative">
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Busca</label>
-          <Search class="w-4 h-4 absolute left-3 top-8 text-slate-400" />
-          <input v-model="filters.search" type="text" placeholder="Nome, Banco, Doc..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Busca</label>
+          <Search class="w-4 h-4 absolute left-3 top-[35px] text-slate-400" />
+          <input v-model="filters.search" type="text" placeholder="Nome, Banco, Doc..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" />
         </div>
-        <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-500 uppercase mb-1">De</label><input v-model="filters.date_start" type="date" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
-        <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Até</label><input v-model="filters.date_end" type="date" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
+        <div class="md:col-span-2"><label class="block text-[13px] font-medium text-slate-700 mb-1.5">De</label><input v-model="filters.date_start" type="date" class="w-full px-2 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" /></div>
+        <div class="md:col-span-2"><label class="block text-[13px] font-medium text-slate-700 mb-1.5">Até</label><input v-model="filters.date_end" type="date" class="w-full px-2 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" /></div>
         <div class="md:col-span-2 relative">
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-          <button @click.stop="showStatusFilter = !showStatusFilter" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm flex justify-between items-center">
-            <span class="truncate">{{ filters.status.length === 0 ? 'Todos' : filters.status.length + ' selecionados' }}</span>
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Status</label>
+          <button @click.stop="showStatusFilter = !showStatusFilter" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm flex justify-between items-center shadow-xs hover:bg-slate-50 transition-colors">
+            <span class="truncate">{{ rotuloFiltroStatus }}</span>
             <Filter class="w-4 h-4 text-slate-400" />
           </button>
-          <div v-if="showStatusFilter" @click.stop class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-2">
-            <div v-for="s in statusFiltro" :key="s" @click="toggleStatusFilter(s)" class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer">
+          <div v-if="showStatusFilter" @click.stop class="absolute top-full left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 p-1">
+            <div class="flex gap-1 p-1 mb-1 border-b border-slate-100">
+              <button @click="filters.status = [...EM_ABERTO]" class="flex-1 px-1.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap" :class="rotuloFiltroStatus === 'Em aberto' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'">Em aberto</button>
+              <button @click="filters.status = []" class="flex-1 px-1.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap" :class="rotuloFiltroStatus === 'Todos' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'">Todos</button>
+            </div>
+            <div v-for="s in statusOptions" :key="s" @click="toggleStatusFilter(s)" class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-md cursor-pointer">
               <CheckSquare v-if="isStatusSelected(s)" class="w-4 h-4 text-indigo-600" />
               <Square v-else class="w-4 h-4 text-slate-300" />
-              <span class="text-sm text-slate-700">{{ s }}</span>
+              <span class="text-sm text-slate-700">{{ rotuloStatus(s) }}</span>
             </div>
           </div>
         </div>
         <div class="md:col-span-2">
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cálculo</label>
-          <select v-model="filters.calculo" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Cálculo</label>
+          <select v-model="filters.calculo" class="w-full px-2 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
             <option value="">Todos</option>
             <option value="dentro">Só os que contam</option>
             <option value="fora">Só histórico (fora)</option>
           </select>
         </div>
-        <div class="md:col-span-1"><button @click="resetFilters" class="w-full py-2 text-slate-400 hover:text-red-500 text-xs font-bold">Limpar</button></div>
+        <div class="md:col-span-1"><button @click="resetFilters" class="w-full py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-sm font-medium transition-colors">Limpar</button></div>
       </div>
 
-      <div class="bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <div class="text-xs text-slate-600">
-          <template v-if="!modoSelecao">Tirar ou voltar cheques ao cálculo em lote</template>
-          <template v-else-if="todosDoFiltro">
-            <strong class="text-slate-900">Todos os {{ totalItems }}</strong> cheques do filtro selecionados ·
-            <button @click="limparSelecao" class="font-bold text-indigo-600 hover:underline">limpar</button>
-          </template>
-          <template v-else>
-            <strong class="text-slate-900">{{ selecionados.length }}</strong> marcado(s) ·
-            <button @click="toggleTodosDoFiltro" class="font-bold text-indigo-600 hover:underline">selecionar todos os {{ totalItems }} do filtro</button>
-            <template v-if="selecionados.length"> · <button @click="limparSelecao" class="font-bold text-slate-400 hover:underline">limpar</button></template>
-          </template>
-        </div>
-        <div class="flex gap-2">
-          <template v-if="modoSelecao">
-            <button @click="aplicarCalculo(true)" :disabled="!qtdSelecionada"
-                    class="bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-slate-900 disabled:opacity-40">
-              <Archive class="w-4 h-4 mr-1.5" /> Tirar do cálculo
-            </button>
-            <button @click="aplicarCalculo(false)" :disabled="!qtdSelecionada"
-                    class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-slate-50 disabled:opacity-40">
-              <RotateCcw class="w-4 h-4 mr-1.5" /> Voltar ao cálculo
-            </button>
-            <button @click="sairDaSelecao" class="px-3 py-1.5 rounded-lg font-bold text-xs text-slate-500 hover:bg-slate-100">Cancelar</button>
-          </template>
-          <button v-else @click="modoSelecao = true" class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-slate-50">
-            <CheckSquare class="w-4 h-4 mr-1.5" /> Selecionar
-          </button>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[400px]">
-        <div v-if="resumo" class="px-4 py-3 border-b border-slate-200 bg-slate-50/60 flex flex-wrap items-center gap-2">
-          <div class="mr-2">
-            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total do filtro</div>
-            <div class="text-lg font-bold text-slate-900 tabular-nums">{{ formatCurrency(resumo.valor) }}
-              <span class="text-xs font-bold text-slate-500">· {{ resumo.qtd }} cheque(s)</span></div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col min-h-[400px]">
+        <div v-if="resumo" class="px-5 py-4 border-b border-slate-200 flex flex-wrap items-center gap-2">
+          <div class="mr-4">
+            <div class="text-xs font-medium text-slate-500">Total do filtro</div>
+            <div class="text-xl font-semibold text-slate-900 tracking-tight tabular-nums">{{ formatCurrency(resumo.valor) }}
+              <span class="text-xs font-medium text-slate-500 tracking-normal">· {{ resumo.qtd }} cheque(s)</span></div>
           </div>
           <div v-for="s in resumo.por_status" :key="s.status"
-               :class="['px-2.5 py-1 rounded-lg border text-xs', getStatusColor(s.status)]">
-            <span class="font-black uppercase text-[10px] tracking-tight">{{ s.status }}</span>
-            <span class="font-bold tabular-nums ml-1">{{ formatCurrency(s.valor) }}</span>
+               :class="['px-2.5 py-1 rounded-md border text-xs', getStatusColor(s.status)]">
+            <span class="font-medium">{{ rotuloStatus(s.status) }}</span>
+            <span class="font-semibold tabular-nums ml-1">{{ formatCurrency(s.valor) }}</span>
             <span class="opacity-70 ml-1">({{ s.qtd }})</span>
           </div>
-          <div v-if="resumo.fora.qtd" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-100 text-slate-600 text-xs"
+          <div v-if="resumo.fora.qtd" class="px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 text-slate-600 text-xs"
                title="Já estão somados acima; são histórico e não entram nos números do painel">
-            <span class="font-black uppercase text-[10px] tracking-tight">fora do cálculo</span>
-            <span class="font-bold tabular-nums ml-1">{{ formatCurrency(resumo.fora.valor) }}</span>
+            <span class="font-medium">Fora do cálculo</span>
+            <span class="font-semibold tabular-nums ml-1">{{ formatCurrency(resumo.fora.valor) }}</span>
             <span class="opacity-70 ml-1">({{ resumo.fora.qtd }})</span>
           </div>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full text-left">
-            <thead class="bg-slate-50 border-b border-slate-200">
-              <tr class="text-[11px] font-bold text-slate-500 uppercase">
-                <th v-if="modoSelecao" class="pl-3 pr-1 py-2.5 w-8">
-                  <button @click="toggleTodosDoFiltro" class="text-slate-400 hover:text-indigo-600" :title="`Selecionar todos os ${totalItems} do filtro`">
-                    <CheckSquare v-if="todosDoFiltro" class="w-4 h-4 text-indigo-600" />
-                    <Square v-else class="w-4 h-4" />
-                  </button>
-                </th>
-                <th @click="ordenar('due_date')" class="px-3 py-2.5 cursor-pointer hover:bg-slate-100 whitespace-nowrap">Vencimento</th>
-                <th @click="ordenar('issuer_name')" class="px-3 py-2.5 cursor-pointer hover:bg-slate-100">Cliente / Emitente</th>
-                <th @click="ordenar('amount')" class="px-3 py-2.5 cursor-pointer hover:bg-slate-100 text-right">Valor</th>
-                <th class="px-3 py-2.5 text-center">Status</th>
+          <table class="w-full text-left text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200">
+              <tr class="text-xs font-medium text-slate-500">
+                <th @click="ordenar('due_date')" class="px-3 py-2.5 cursor-pointer hover:text-slate-800 whitespace-nowrap">Vencimento</th>
+                <th @click="ordenar('issuer_name')" class="px-3 py-2.5 cursor-pointer hover:text-slate-800">Cliente / Emitente</th>
+                <th class="px-3 py-2.5 whitespace-nowrap">Banco / Doc</th>
+                <th class="px-3 py-2.5">Borderô</th>
+                <th @click="ordenar('amount')" class="px-3 py-2.5 cursor-pointer hover:text-slate-800 text-right">Valor</th>
+                <th class="px-3 py-2.5">Status</th>
                 <th class="px-3 py-2.5"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-for="cheque in dados" :key="cheque.id" @click="abrirDetalhes(cheque)"
-                  :class="['hover:bg-indigo-50 cursor-pointer transition-colors text-sm', cheque.fora_do_calculo ? 'bg-slate-50/70' : '', modoSelecao && isSelecionado(cheque.id) ? 'bg-indigo-50/60' : '']">
-                <td v-if="modoSelecao" class="pl-3 pr-1 py-2.5" @click.stop="toggleSelecao(cheque.id)">
-                  <button class="text-slate-300 hover:text-indigo-600">
-                    <CheckSquare v-if="isSelecionado(cheque.id)" class="w-4 h-4 text-indigo-600" />
-                    <Square v-else class="w-4 h-4" />
-                  </button>
-                </td>
-                <td class="px-3 py-2.5 font-bold text-slate-700 whitespace-nowrap">{{ formatDate(cheque.vencimento) }}</td>
-                <td class="px-3 py-2.5 max-w-[340px]">
-                  <div class="font-bold text-slate-900 truncate" :title="cheque.cliente">{{ cheque.cliente }}</div>
-                  <div class="text-xs text-slate-500 truncate" :title="cheque.emitente">{{ cheque.emitente }}</div>
-                  <div class="text-[10px] text-slate-400 truncate">
-                    Borderô #{{ cheque.operation_id }}<template v-if="cheque.num_doc"> · Doc {{ cheque.num_doc }}</template><template v-if="cheque.banco"> · {{ cheque.banco }}</template>
-                    <span v-if="cheque.fora_do_calculo" class="ml-1 px-1 rounded bg-slate-200 text-slate-600 font-black uppercase">fora do cálculo</span>
-                    <span v-if="cheque.importado" class="ml-1 px-1 rounded border border-indigo-200 text-indigo-600 font-black uppercase">importado</span>
+                  :class="['hover:bg-slate-50 cursor-pointer transition-colors', cheque.fora_do_calculo ? 'bg-slate-50/70' : '']">
+                <td class="px-3 py-2.5 whitespace-nowrap align-top">
+                  <div class="font-semibold text-slate-800 tabular-nums">{{ formatDate(cheque.vencimento) }}</div>
+                  <div v-if="atraso(cheque)" class="text-[11px] font-medium text-red-600">há {{ atraso(cheque) }} dia{{ atraso(cheque) > 1 ? 's' : '' }}</div>
+                  <div v-if="cheque.prorrogacoes" data-campo="marca-prorrogado"
+                       :title="`Prorrogado ${cheque.prorrogacoes > 1 ? cheque.prorrogacoes + ' vezes' : 'uma vez'} · vencimento original ${formatDate(cheque.vencimento_original)}`"
+                       class="mt-1 inline-flex items-center gap-1 px-1.5 py-px rounded-md border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-medium">
+                    <CalendarClock class="w-3 h-3" /> prorrogado{{ cheque.prorrogacoes > 1 ? ` ${cheque.prorrogacoes}x` : '' }}
                   </div>
                 </td>
-                <td class="px-3 py-2.5 font-bold text-emerald-600 text-right tabular-nums whitespace-nowrap">{{ formatCurrency(cheque.valor_bruto) }}</td>
-                <td class="px-3 py-2.5 text-center">
-                  <button @click.stop="toggleStatusMenu(cheque, $event)" :class="['px-2.5 py-1 rounded-full text-[10px] font-black border inline-flex items-center gap-1 uppercase tracking-tighter whitespace-nowrap', getStatusColor(cheque.status)]">
-                     {{ cheque.status }} <ChevronDown class="w-3 h-3 opacity-50"/>
+                <td class="px-3 py-2.5 max-w-[300px] align-top">
+                  <div class="font-semibold text-slate-900 truncate" :title="cheque.cliente">{{ cheque.cliente }}</div>
+                  <div class="text-xs text-slate-500 truncate" :title="cheque.emitente">{{ cheque.emitente }}</div>
+                </td>
+                <td class="px-3 py-2.5 max-w-[160px] align-top">
+                  <div class="text-slate-700 truncate" :title="cheque.banco">{{ cheque.banco || '—' }}</div>
+                  <div class="text-xs text-slate-500 truncate">{{ cheque.num_doc ? 'doc ' + cheque.num_doc : (cheque.tipo === 'PROMISSORIA' ? 'promissória' : '') }}</div>
+                </td>
+                <td class="px-3 py-2.5 whitespace-nowrap align-top">
+                  <div class="text-slate-700 tabular-nums">#{{ cheque.operation_id }}</div>
+                  <div class="flex gap-1 mt-0.5">
+                    <span v-if="cheque.fora_do_calculo" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">fora do cálculo</span>
+                    <span v-if="cheque.importado" class="px-1.5 py-px rounded-md border border-slate-200 text-slate-500 text-[11px] font-medium">importado</span>
+                  </div>
+                </td>
+                <td class="px-3 py-2.5 font-semibold text-slate-900 text-right tabular-nums whitespace-nowrap align-top">{{ formatCurrency(cheque.valor_bruto) }}</td>
+                <td class="px-3 py-2.5 align-top">
+                  <button @click.stop="toggleStatusMenu(cheque, $event)" :class="['pl-2 pr-1.5 py-0.5 rounded-md text-xs font-medium border inline-flex items-center gap-1.5 whitespace-nowrap before:w-1.5 before:h-1.5 before:rounded-full before:bg-current before:opacity-80', getStatusColor(cheque.status)]">
+                     {{ rotuloStatus(cheque.status) }} <ChevronDown class="w-3 h-3 opacity-60"/>
                   </button>
                 </td>
-                <td class="px-2 py-2.5">
+                <td class="px-2 py-2 align-top">
                   <div class="flex justify-end gap-0.5">
                     <button v-if="cheque.status !== 'Pago'" @click.stop="abrirRecebimento(cheque)"
                             title="Receber (uma conta ou dividido)"
-                            class="p-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><HandCoins class="w-4 h-4"/></button>
-                    <button v-if="cheque.status !== 'Pago'" @click.stop="abrirProrrogacao(cheque)" title="Prorrogar / receber parte" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><CalendarClock class="w-4 h-4"/></button>
-                    <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-1.5 rounded-lg text-slate-300 hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil class="w-4 h-4"/></button>
-                    <button @click.stop="deletarCheque(cheque.id)" title="Excluir" class="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
+                            class="p-1.5 rounded-md text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"><HandCoins class="w-4 h-4"/></button>
+                    <button v-if="cheque.status !== 'Pago'" @click.stop="abrirProrrogacao(cheque)" title="Prorrogar / receber parte" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><CalendarClock class="w-4 h-4"/></button>
+                    <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-1.5 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil class="w-4 h-4"/></button>
+                    <button @click.stop="deletarCheque(cheque.id)" title="Excluir" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                   </div>
                 </td>
               </tr>
@@ -555,11 +435,11 @@ const exportarTela = () => {
           </table>
         </div>
 
-        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
-          <span class="text-xs text-slate-500 font-bold">Página {{ currentPage }} de {{ totalPages }}</span>
+        <div class="px-5 py-3 border-t border-slate-200 flex justify-between items-center">
+          <span class="text-[13px] text-slate-500">Página <span class="font-semibold text-slate-700">{{ currentPage }}</span> de <span class="font-semibold text-slate-700">{{ totalPages }}</span></span>
           <div class="flex gap-2">
-            <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 bg-white border rounded text-slate-600 hover:bg-slate-100 disabled:opacity-50"><ArrowLeft class="w-4 h-4" /></button>
-            <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage === totalPages" class="px-3 py-1 bg-white border rounded text-slate-600 hover:bg-slate-100 disabled:opacity-50"><ArrowRight class="w-4 h-4" /></button>
+            <button @click="mudarPagina(currentPage - 1)" :disabled="currentPage === 1" class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none"><ArrowLeft class="w-4 h-4" /></button>
+            <button @click="mudarPagina(currentPage + 1)" :disabled="currentPage === totalPages" class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:shadow-none"><ArrowRight class="w-4 h-4" /></button>
           </div>
         </div>
       </div>
@@ -567,9 +447,9 @@ const exportarTela = () => {
 
     <div v-if="openStatusMenuId && menuCheque" 
          :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }" 
-         class="fixed z-[9999] -translate-x-1/2 w-32 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden text-left"
+         class="fixed z-[9999] -translate-x-1/2 w-36 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden text-left p-1"
          @click.stop>
-      <div v-for="opt in statusOptions" :key="opt" @click="alterarStatus(menuCheque, opt)" class="px-3 py-2 text-[10px] font-black uppercase hover:bg-slate-50 cursor-pointer text-slate-600 border-b border-slate-50 last:border-0">{{ opt }}</div>
+      <div v-for="opt in statusOptions" :key="opt" @click="alterarStatus(menuCheque, opt)" class="px-2.5 py-1.5 text-[13px] font-medium rounded-md hover:bg-slate-100 cursor-pointer text-slate-700">{{ rotuloStatus(opt) }}</div>
     </div>
   </DashboardLayout>
 </template>

@@ -79,10 +79,10 @@ const usarRestante = (parte) => {
             {{ p.conta }} {{ pctTexto(p.valor) }}
           </span>
         </div>
-        <span v-if="fecha" class="flex items-center gap-1 font-black text-emerald-600 uppercase text-[10px] tracking-wide">
+        <span v-if="fecha" class="flex items-center gap-1 font-semibold text-emerald-600 text-xs">
           <CheckCircle2 class="w-3.5 h-3.5" /> Fechou
         </span>
-        <span v-else class="font-black uppercase text-[10px] tracking-wide" data-campo="partes-restante"
+        <span v-else class="font-semibold text-xs" data-campo="partes-restante"
               :class="restante > 0 ? 'text-amber-600' : 'text-red-600'">
           {{ restante > 0 ? `Falta ${dinheiro(restante)}` : `Passou ${dinheiro(-restante)}` }}
         </span>
@@ -93,9 +93,9 @@ const usarRestante = (parte) => {
       <div v-for="(p, i) in partes" :key="'p' + i"
            class="border border-slate-200 rounded-xl p-3 bg-white hover:border-slate-300 transition-colors">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parte {{ i + 1 }}</span>
+          <span class="text-xs font-medium text-slate-500">Parte {{ i + 1 }}</span>
           <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded-md text-[11px] font-black border" :class="ESTILO[p.conta].chip">
+            <span class="px-2 py-0.5 rounded-md text-[11px] font-bold border" :class="ESTILO[p.conta].chip">
               {{ pctTexto(p.valor) }}
             </span>
             <button v-if="partes.length > 1" @click="removerParte(i)" aria-label="Remover parte"
@@ -116,7 +116,7 @@ const usarRestante = (parte) => {
 
         <div class="grid grid-cols-12 gap-2 items-center">
           <select v-model="p.forma" aria-label="Como recebeu"
-                  class="col-span-5 bg-slate-50 border border-slate-200 rounded-lg py-2 px-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="col-span-5 bg-white border border-slate-300 rounded-lg py-2 px-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow">
             <option v-for="f in FORMAS[p.conta]" :key="f" :value="f">{{ f }}</option>
           </select>
 
@@ -125,7 +125,7 @@ const usarRestante = (parte) => {
             <input v-model="p.valor" type="number" step="0.01" min="0" inputmode="decimal"
                    aria-label="Valor da parte" data-campo="parte-valor"
                    @focus="$event.target.select()" @keyup.enter="emit('enviar')"
-                   class="w-full border border-slate-300 rounded-lg py-2 pl-8 pr-2 text-sm font-bold text-slate-800 text-right outline-none focus:ring-2 focus:ring-indigo-500" />
+                   class="w-full border border-slate-300 rounded-lg py-2 pl-8 pr-2 text-sm font-bold text-slate-800 text-right outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
         </div>
 
@@ -150,9 +150,8 @@ const usarRestante = (parte) => {
     <p v-if="!compacto" class="text-xs text-slate-500 bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-2">
       <Link2 class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
       <span>
-        Vão aparecer <strong class="text-indigo-900">{{ partes.length }} linhas no caixa</strong>
-        (uma por conta, com o valor de cada parte), todas vinculadas a este mesmo cheque —
-        no Fluxo de Caixa elas aparecem agrupadas.
+        Cada parte entra no caixa <strong class="text-indigo-900">na sua conta</strong>, com o valor
+        dela, tudo vinculado a este mesmo cheque — no Fluxo de Caixa as linhas aparecem agrupadas.
       </span>
     </p>
   </div>

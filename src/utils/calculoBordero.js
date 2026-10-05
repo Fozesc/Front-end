@@ -106,3 +106,18 @@ export const calcularProrrogacao = ({
     novoTotal: arredondar(totalComJuros - valorPago)
   };
 };
+
+// Imposto do Receber (juros + IOF de quem paga depois do combinado): o fator do borderô
+// direto sobre o valor devido, juros = valor x ((1 + taxa)^(dias/30) - 1) - a conta de juros
+// do Borderô Bruto. Serve para qualquer prazo: a conta inversa da prorrogacao explode perto
+// de 1 ano de atraso e quebra depois. IOF como no borderô, com o diario limitado a 365 dias
+// (regra do IOF). Pagou em dia (sem dias) = zero.
+export const IOF_DIAS_LIMITE = 365;
+export const calcularImposto = ({ valor, dataBase, dataPagamento, taxaMensal, diasCompensacao = 0, iofEnabled, iofBase, iofDiario }) => {
+  const dias = calcularDias(dataBase, dataPagamento, diasCompensacao);
+  const v = Number(valor) || 0;
+  if (v <= 0 || dias <= 0) return { dias, juros: 0, iof: 0, encargos: 0 };
+  const { juros } = calcularLinha({ valor: v, dias, taxaMensal, iofEnabled: false });
+  const iof = iofEnabled ? arredondar(v * (iofBase / 100) + v * (iofDiario / 100) * Math.min(dias, IOF_DIAS_LIMITE)) : 0;
+  return { dias, juros, iof, encargos: arredondar(juros + iof) };
+};
