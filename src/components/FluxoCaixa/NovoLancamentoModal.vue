@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, onMounted, computed } from 'vue';
-import { X, Save, ArrowUpCircle, ArrowDownCircle, Wallet, Building, Banknote } from 'lucide-vue-next';
+import { X, Save, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Wallet, Building, Banknote } from 'lucide-vue-next';
 import BaseDateInput from '../common/BaseDateInput.vue';
 
 const props = defineProps({
@@ -15,10 +15,19 @@ const form = reactive({
   valor: '',
   data: new Date().toISOString().split('T')[0],
   origem: 'Dinheiro',
-  category: 'Geral'
+  category: 'Geral',
+  conta_entrada: 'Dinheiro',
+  conta_saida: 'Banco do Brasil'
 });
 
+const CONTAS = [
+  { id: 'Dinheiro', nome: 'Dinheiro', icone: Wallet, ativo: 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' },
+  { id: 'Banco do Brasil', nome: 'BB', icone: Building, ativo: 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' },
+  { id: 'Caixa Econômica', nome: 'Caixa', icone: Banknote, ativo: 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' }
+];
+
 const isEdicao = computed(() => !!props.lancamento);
+const isTrocaExistente = computed(() => !!props.lancamento?.troca_id);
 
 onMounted(() => {
 
@@ -34,6 +43,18 @@ onMounted(() => {
 });
 
 const salvar = () => {
+  if (form.tipo === 'troca') {
+    if (!form.valor || parseFloat(form.valor) <= 0) return alert("Preencha o valor");
+    if (form.conta_entrada === form.conta_saida) return alert("Escolha contas diferentes para a troca");
+    return emit('save', {
+      troca: true,
+      descricao: form.descricao,
+      valor: Math.abs(parseFloat(form.valor)),
+      data: form.data,
+      conta_entrada: form.conta_entrada,
+      conta_saida: form.conta_saida
+    });
+  }
   if (!form.descricao || !form.valor) return alert("Preencha descrição e valor");
   
 
@@ -67,18 +88,24 @@ const salvar = () => {
 
       <div class="p-6 space-y-5">
         
-        <div class="flex bg-slate-100 p-1 rounded-lg">
+        <div v-if="isTrocaExistente" class="flex items-center gap-2 text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+          <ArrowLeftRight class="w-4 h-4 shrink-0" /> Lançamento de troca: valor, data e descrição também são atualizados na outra linha.
+        </div>
+        <div v-else class="flex bg-slate-100 p-1 rounded-lg">
           <button @click="form.tipo = 'entrada'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'entrada' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
             <ArrowUpCircle class="w-4 h-4" /> Entrada
           </button>
           <button @click="form.tipo = 'saida'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'saida' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
             <ArrowDownCircle class="w-4 h-4" /> Saída
           </button>
+          <button v-if="!isEdicao" @click="form.tipo = 'troca'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'troca' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+            <ArrowLeftRight class="w-4 h-4" /> Troca
+          </button>
         </div>
 
         <div>
           <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Descrição</label>
-          <input v-model="form.descricao" type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="Ex: Pagamento Fornecedor" />
+          <input v-model="form.descricao" type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" :placeholder="form.tipo === 'troca' ? 'Ex: João - dinheiro por PIX' : 'Ex: Pagamento Fornecedor'" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -92,17 +119,26 @@ const salvar = () => {
           </div>
         </div>
 
-        <div>
+        <div v-if="form.tipo === 'troca'" class="space-y-4">
+          <div v-for="lado in [{ campo: 'conta_entrada', rotulo: 'Entra em (o que recebi)' }, { campo: 'conta_saida', rotulo: 'Sai de (o que entreguei)' }]" :key="lado.campo">
+            <label class="block text-[13px] font-medium text-slate-700 mb-2">{{ lado.rotulo }}</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button v-for="c in CONTAS" :key="c.id" @click="form[lado.campo] = c.id" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form[lado.campo] === c.id ? c.ativo : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
+                <component :is="c.icone" class="w-5 h-5" /> {{ c.nome }}
+              </button>
+            </div>
+          </div>
+          <p v-if="form.conta_entrada === form.conta_saida" class="text-xs text-red-600 font-medium">Escolha contas diferentes.</p>
+          <p v-else-if="form.valor > 0" class="text-xs text-slate-500">
+            Entrada de <strong class="text-emerald-600">R$ {{ Number(form.valor).toFixed(2) }}</strong> em {{ form.conta_entrada }} e saída de <strong class="text-red-600">R$ {{ Number(form.valor).toFixed(2) }}</strong> em {{ form.conta_saida }}. O total do caixa não muda.
+          </p>
+        </div>
+
+        <div v-else>
           <label class="block text-[13px] font-medium text-slate-700 mb-2">Conta / Origem</label>
           <div class="grid grid-cols-3 gap-2">
-            <button @click="form.origem = 'Dinheiro'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Dinheiro' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
-              <Wallet class="w-5 h-5" /> Dinheiro
-            </button>
-            <button @click="form.origem = 'Banco do Brasil'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Banco do Brasil' ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
-              <Building class="w-5 h-5" /> BB
-            </button>
-            <button @click="form.origem = 'Caixa Econômica'" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === 'Caixa Econômica' ? 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
-              <Banknote class="w-5 h-5" /> Caixa
+            <button v-for="c in CONTAS" :key="c.id" @click="form.origem = c.id" class="flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-xs font-bold gap-1" :class="form.origem === c.id ? c.ativo : 'border-slate-200 hover:bg-slate-50 text-slate-500'">
+              <component :is="c.icone" class="w-5 h-5" /> {{ c.nome }}
             </button>
           </div>
         </div>

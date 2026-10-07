@@ -7,7 +7,7 @@ import DetalhesLancamentoModal from '../components/FluxoCaixa/DetalhesLancamento
 
 import { 
   Building, Banknote, Plus, Trash2, Edit2, Settings, ArrowDownCircle,
-  Loader2, TrendingUp, AlertTriangle, Link2
+  Loader2, TrendingUp, AlertTriangle, Link2, ArrowLeftRight
 } from 'lucide-vue-next';
 
 import transactionService from '../services/transactionService';
@@ -91,11 +91,12 @@ const abrirModalEdicao = (item) => { lancamentoEmEdicao.value = { ...item }; sho
 const salvarLancamento = async (dados) => {
   try {
     if (lancamentoEmEdicao.value?.id) await transactionService.update(lancamentoEmEdicao.value.id, dados);
+    else if (dados.troca) await transactionService.troca(dados);
     else await transactionService.create(dados);
     showModal.value = false;
     await carregarTabela();
     await carregarSaldos(); 
-  } catch (error) { alert("Erro ao salvar."); }
+  } catch (error) { alert(error.response?.data?.error || "Erro ao salvar."); }
 };
 
 const excluirLancamento = (item) => {
@@ -110,6 +111,7 @@ const excluirLancamento = (item) => {
 const vinculoDoLancamento = computed(() => {
   const i = confirmModal.item;
   if (!i) return '';
+  if (i.troca_id) return 'Esta linha faz parte de uma troca. A entrada e a saída da troca serão apagadas juntas.';
   if (i.check_id) return 'Esta linha é a baixa de um cheque. Apagar tira o dinheiro do caixa, mas o cheque continua marcado como Pago.';
   if (i.operation_id) return 'Esta linha é o dinheiro emprestado em um borderô. Apagar tira a saída do caixa, mas o borderô continua lá.';
   return '';
@@ -318,16 +320,22 @@ const linhas = computed(() => {
             <tr v-if="loading"><td colspan="6" class="px-6 py-10 text-center"><Loader2 class="w-6 h-6 animate-spin mx-auto"/></td></tr>
             <tr v-for="item in linhas" :key="item.id"
                 class="hover:bg-slate-50 transition-colors"
-                :class="item.parte ? 'bg-indigo-50/40' : ''">
+                :class="item.parte || item.troca_id ? 'bg-indigo-50/40' : ''">
               <td class="px-4 py-2.5 text-slate-500 tabular-nums text-[13px] whitespace-nowrap"
-                  :class="item.parte ? 'border-l-[3px] border-indigo-400' : ''">
+                  :class="item.parte || item.troca_id ? 'border-l-[3px] border-indigo-400' : ''">
                 {{ item.parte && !item.primeiraDoGrupo ? '' : formatDate(item.data) }}
               </td>
               <td class="px-4 py-2.5 font-medium text-slate-800">
                 <div class="flex items-center gap-2">
                   <Link2 v-if="item.parte" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"
                          title="Parte de um recebimento dividido (mesmo cheque)" />
+                  <ArrowLeftRight v-if="item.troca_id" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
                   <span>{{ item.descricaoLimpa }}</span>
+                </div>
+                <div v-if="item.troca_id" class="mt-1 text-[11px] font-medium">
+                  <span class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">
+                    Troca
+                  </span>
                 </div>
                 <div v-if="item.parte" class="mt-1 flex items-center gap-2 text-[11px] font-medium">
                   <span class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">

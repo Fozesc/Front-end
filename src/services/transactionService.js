@@ -17,6 +17,11 @@ export default {
         return response.data;
     },
 
+    troca: async (data) => {
+        const response = await api.post('/transactions/troca', data);
+        return response.data;
+    },
+
     update: async (id, data) => {
         const response = await api.put(`/transactions/${id}`, data);
         return response.data;
