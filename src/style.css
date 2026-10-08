@@ -55,6 +55,11 @@ body {
   height: 100%;
 }
 
+/* Impressao: papel branco (o cinza do fundo saia junto com "graficos de fundo" ligado) */
+@media print {
+  body { background: #fff; min-width: 0; }
+}
+
 /* Fundo das telas: cinza bem claro e frio, os cards brancos se destacam pela sombra */
 .app-bg {
   background: #f6f7f9;

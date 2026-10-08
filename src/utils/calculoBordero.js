@@ -54,6 +54,16 @@ export const calcularLinha = ({ valor, dias, taxaMensal, iofEnabled, iofBase, io
   return { juros, iof, liquido: arredondar(valorFace - juros - iof) };
 };
 
+// Comissao de alguem da empresa: `comissao` pontos dos `taxaMensal` pontos da taxa
+// (2 de 8% = 25% dos juros). Sai dos juros: nao muda juros, IOF nem liquido.
+// O servidor (operation_service.calcular_comissao) faz a mesma conta.
+export const calcularComissao = ({ juros, comissao, taxaMensal }) => {
+  const c = Number(comissao) || 0;
+  const t = Number(taxaMensal) || 0;
+  if (c <= 0 || t <= 0) return { valor: 0, parte: 0 };
+  return { valor: arredondar(arredondar(juros) * c / t), parte: c / t * 100 };
+};
+
 // Borderô de Liquido (Inverso): quanto de valor de face rende 1 real de liquido numa
 // data. Valor de face = liquido / soma dos divisores. Divisor <= 0 = prazo longo
 // demais para a conta inversa fechar.

@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
     
     <div 
       @click="toggleOpen"
-      class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 flex justify-between items-center cursor-pointer hover:border-slate-400 shadow-xs transition-all h-[42px]"
+      class="w-full bg-white border border-slate-300 rounded-md px-3 flex justify-between items-center cursor-pointer hover:border-slate-400 shadow-xs transition-all h-10"
       :class="{'ring-4 ring-indigo-500/15 border-indigo-500 hover:border-indigo-500': isOpen}"
     >
       <div v-if="selectedLabel" class="flex items-center gap-2 font-medium text-slate-900 text-sm">
@@ -119,7 +119,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="isOpen" class="absolute left-0 top-full mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+    <div v-if="isOpen" class="absolute left-0 top-full mt-1.5 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
       
       <div class="p-2 border-b border-slate-100">
         <div class="relative">

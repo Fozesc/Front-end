@@ -140,14 +140,14 @@ const handleSave = () => {
                       :class="form.contaSaida === 'Dinheiro' ? 'border-emerald-500 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'">
                       <Wallet class="w-4 h-4 mb-1" /> Dinheiro
                     </button>
-                    <button @click="form.contaSaida = 'Banco do Brasil'" 
+                    <button @click="form.contaSaida = 'BB'" 
                       class="flex flex-col items-center justify-center p-2 rounded-lg border transition-all text-xs font-bold"
-                      :class="form.contaSaida === 'Banco do Brasil' ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'">
+                      :class="form.contaSaida === 'BB' ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'">
                       <Building class="w-4 h-4 mb-1" /> BB
                     </button>
-                    <button @click="form.contaSaida = 'Caixa Econômica'" 
+                    <button @click="form.contaSaida = 'Caixa'" 
                       class="flex flex-col items-center justify-center p-2 rounded-lg border transition-all text-xs font-bold"
-                      :class="form.contaSaida === 'Caixa Econômica' ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'">
+                      :class="form.contaSaida === 'Caixa' ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'">
                       <Banknote class="w-4 h-4 mb-1" /> Caixa
                     </button>
                   </div>

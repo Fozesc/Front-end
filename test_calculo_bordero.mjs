@@ -2,7 +2,7 @@
 // Rode:  node test_calculo_bordero.mjs
 import assert from 'node:assert/strict';
 import {
-  arredondar, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao, calcularImposto
+  arredondar, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao, calcularImposto, calcularComissao
 } from './src/utils/calculoBordero.js';
 
 const IOF = { iofEnabled: true, iofBase: 0.38, iofDiario: 0.0082 };
@@ -111,6 +111,17 @@ for (let d = 1; d <= 2000; d += 7) {
   anterior = r.encargos;
 }
 
+// Comissao: 2 pontos dos 8% da taxa = 25% dos juros; nao mexe no juros nem no liquido
+const ex = calcularLinha({ valor: 10000, dias: calcularDias('2026-10-01', '2026-10-31', 2), taxaMensal: 8, iofEnabled: false });
+assert.equal(ex.juros, 855.55);
+const c = calcularComissao({ juros: ex.juros, comissao: 2, taxaMensal: 8 });
+assert.deepEqual(c, { valor: 213.89, parte: 25 });
+assert.equal(calcularComissao({ juros: ex.juros, comissao: '2', taxaMensal: '10' }).parte, 20, 'mesmos 2 pontos numa taxa de 10%');
+assert.equal(calcularComissao({ juros: 0.1 + 0.2, comissao: 8, taxaMensal: 8 }).valor, 0.3, 'comissao = taxa leva os juros inteiros');
+for (const [comissao, taxaMensal] of [[0, 8], ['', 8], [null, 8], [2, 0], [-1, 8]]) {
+  assert.deepEqual(calcularComissao({ juros: 855.56, comissao, taxaMensal }), { valor: 0, parte: 0 }, `${comissao}/${taxaMensal}`);
+}
+
 console.log('OK: juros da prorrogação pelo Borderô de Líquido (Inverso) sobre o saldo, padrão = paga os juros ' +
             '(valor devido igual), pagamento quita juros antes de abater, menos que os juros soma no saldo, ' +
-            'sem prorrogar, ajuste manual, taxa/IOF, prazo inválido e imposto do Receber.');
+            'sem prorrogar, ajuste manual, taxa/IOF, prazo inválido, imposto do Receber e comissão (pontos da taxa).');

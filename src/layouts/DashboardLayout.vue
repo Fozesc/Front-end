@@ -76,10 +76,10 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="flex h-screen app-bg overflow-hidden font-sans">
+  <div class="flex h-screen app-bg overflow-hidden font-sans print:block print:h-auto print:overflow-visible print:bg-white">
 
     <aside
-      class="hidden md:flex flex-col bg-white transition-[width] duration-200 ease-in-out fixed h-full z-50 border-r border-slate-200/80"
+      class="hidden md:flex print:hidden flex-col bg-white transition-[width] duration-200 ease-in-out fixed h-full z-50 border-r border-slate-200/80"
       :class="isSidebarCollapsed ? 'w-[68px]' : 'w-64'"
     >
       <div class="h-16 flex items-center px-4 flex-shrink-0" :class="isSidebarCollapsed ? 'justify-center px-0' : ''">
@@ -189,18 +189,18 @@ const handleLogout = async () => {
     </div>
 
     <div
-      class="flex-1 flex flex-col h-screen overflow-hidden transition-[padding] duration-200 ease-in-out"
+      class="flex-1 flex flex-col h-screen overflow-hidden transition-[padding] duration-200 ease-in-out print:block print:h-auto print:overflow-visible print:pl-0"
       :class="isSidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-64'"
     >
-      <div class="md:hidden absolute top-3 left-3 z-20">
+      <div class="md:hidden print:hidden absolute top-3 left-3 z-20">
         <button @click="toggleMobileSidebar" aria-label="Abrir menu"
                 class="p-2 rounded-lg text-slate-600 hover:text-slate-900 bg-white shadow-sm ring-1 ring-slate-200">
           <Menu class="h-5 w-5" />
         </button>
       </div>
 
-      <main class="flex-1 overflow-y-auto app-bg p-4 md:px-8 md:py-7 pt-14 md:pt-7">
-        <div class="max-w-7xl mx-auto pb-20">
+      <main class="flex-1 overflow-y-auto app-bg p-4 md:px-8 md:py-7 pt-14 md:pt-7 print:overflow-visible print:p-0 print:bg-white">
+        <div class="max-w-7xl mx-auto pb-20 print:max-w-none print:pb-0">
           <slot></slot>
         </div>
       </main>

@@ -17,13 +17,13 @@ const form = reactive({
   origem: 'Dinheiro',
   category: 'Geral',
   conta_entrada: 'Dinheiro',
-  conta_saida: 'Banco do Brasil'
+  conta_saida: 'BB'
 });
 
 const CONTAS = [
   { id: 'Dinheiro', nome: 'Dinheiro', icone: Wallet, ativo: 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500' },
-  { id: 'Banco do Brasil', nome: 'BB', icone: Building, ativo: 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' },
-  { id: 'Caixa Econômica', nome: 'Caixa', icone: Banknote, ativo: 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' }
+  { id: 'BB', nome: 'BB', icone: Building, ativo: 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' },
+  { id: 'Caixa', nome: 'Caixa', icone: Banknote, ativo: 'border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500' }
 ];
 
 const isEdicao = computed(() => !!props.lancamento);
