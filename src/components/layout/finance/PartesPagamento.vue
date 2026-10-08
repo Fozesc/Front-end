@@ -151,7 +151,7 @@ const usarRestante = (parte) => {
       <Link2 class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
       <span>
         Cada parte entra no caixa <strong class="text-indigo-900">na sua conta</strong>, com o valor
-        dela, tudo vinculado a este mesmo cheque — no Fluxo de Caixa as linhas aparecem agrupadas.
+        dela, tudo vinculado a este mesmo pagamento — no Fluxo de Caixa as linhas aparecem agrupadas.
       </span>
     </p>
   </div>

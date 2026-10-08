@@ -112,6 +112,8 @@ const vinculoDoLancamento = computed(() => {
   const i = confirmModal.item;
   if (!i) return '';
   if (i.troca_id) return 'Esta linha faz parte de uma troca. A entrada e a saída da troca serão apagadas juntas.';
+  if (i.vale_id && i.tipo === 'entrada') return `Esta linha é um pagamento do vale #${i.vale_id}. Apagar tira o valor do que foi pago (se estava quitado, o vale volta para Em aberto).`;
+  if (i.vale_id) return `Esta linha é a saída do vale #${i.vale_id}. Apagar tira só a linha do caixa: o vale continua lá. Para apagar o vale inteiro (com a saída e os pagamentos), use o botão Apagar na tela de Vales.`;
   if (i.check_id) return 'Esta linha é a baixa de um cheque. Apagar tira o dinheiro do caixa, mas o cheque continua marcado como Pago.';
   if (i.operation_id) return 'Esta linha é o dinheiro emprestado em um borderô. Apagar tira a saída do caixa, mas o borderô continua lá.';
   return '';
