@@ -8,7 +8,7 @@ import { VERSAO } from '../../../versao';
 import settingsService from '../../../services/settingsService';
 import { motivoNaoUtil, proximoDiaUtil } from '../../../utils/diasUteis';
 import {
-  calcularProrrogacao, iofDasConfiguracoes, IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
+  calcularProrrogacao, calcularComissao, iofDasConfiguracoes, IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
 } from '../../../utils/calculoBordero';
 
 const props = defineProps({
@@ -125,6 +125,21 @@ const r = computed(() => calcularProrrogacao({
   jurosManual: jurosManual.value
 }));
 
+// Comissao (como no borderô): `comissao` pontos da taxa sobre os juros SEM o IOF; juros
+// digitados a mao contam inteiros. Sai do caixa no dia, de `comissaoConta`.
+const comissao = ref(0);
+const comissaoConta = ref('Dinheiro');
+const baseComissao = computed(() => (jurosManual.value !== null ? r.value.juros : r.value.calculado.juros) || 0);
+const comissaoInvalida = computed(() => {
+  const c = Number(comissao.value || 0);
+  return !(c >= 0 && c <= Number(form.value.taxa || 0));
+});
+// invalida conta como zero: a tela nao mostra numero que nao vai ser gravado
+const comissaoCalc = computed(() => (prorrogar.value && !comissaoInvalida.value
+  ? calcularComissao({ juros: baseComissao.value, comissao: comissao.value, taxaMensal: form.value.taxa })
+  : { valor: 0, parte: 0 }));
+const parteComissao = computed(() => `${comissaoCalc.value.parte.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
+
 watch([() => r.value.saldoBase, prorrogar, () => form.value.new_date, () => form.value.data_base,
        () => form.value.taxa, () => form.value.dias_comp, () => form.value.iof],
       () => { jurosManual.value = null; });
@@ -150,6 +165,7 @@ const erros = computed(() => {
     const d = numero(form.value.dias_comp);
     if (!Number.isInteger(d) || d < 0 || d > 30) add('Dias de compensação inválidos.', true);
     if (Number.isNaN(r.value.juros) || r.value.juros < 0) add('Juros inválidos.', true);
+    if (comissaoInvalida.value) add(`A comissão tem que ficar entre 0 e a taxa (${form.value.taxa}%).`);
   } else if (!r.value.pago && !r.value.ajuste) {
     add('Informe o valor pago.');
   }
@@ -186,6 +202,9 @@ const salvar = async () => {
       data_recebimento: pagamento.value.data,
       ...(saldoManual.value !== null ? { saldo_base: r.value.saldoBase } : {}),
       notes: form.value.notes,
+      ...(comissaoCalc.value.valor > 0
+        ? { comissao: Number(comissao.value), comissao_base: baseComissao.value, comissao_conta: comissaoConta.value }
+        : {}),
       ...(r.value.ajuste ? { senha: form.value.senha } : {})
     });
     emit('save', gravado);
@@ -208,6 +227,9 @@ const nota = computed(() => {
   if (r.value.ajuste) linhas.push({ rotulo: '(±) Ajuste manual do saldo', valor: r.value.ajuste });
   if (prorrogar.value) {
     linhas.push({ rotulo: `(+) Juros da prorrogação — ${r.value.dias} dias a ${form.value.taxa}% a.m.${form.value.iof ? ' com IOF' : ''}`, valor: r.value.juros });
+    if (comissaoCalc.value.valor > 0) {
+      linhas.push({ rotulo: `comissão: ${comissao.value} de ${form.value.taxa}% (${parteComissao.value} dos juros)`, valor: comissaoCalc.value.valor, tipo: 'detalhe' });
+    }
   }
   linhas.push({ rotulo: '(=) Total', valor: r.value.totalComJuros, tipo: 'subtotal' });
   if (r.value.pago > 0) {
@@ -292,7 +314,7 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
   <div v-if="isOpen" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="$emit('close')"></div>
 
-    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]" data-modal="prorrogacao">
+    <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]" data-modal="prorrogacao">
       <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-start">
         <div>
           <h3 class="text-base font-semibold text-slate-900 flex items-center gap-2"><CalendarClock class="w-5 h-5 text-indigo-600"/> {{ prorrogar ? 'Prorrogar título' : 'Pagamento parcial' }}</h3>
@@ -308,7 +330,7 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
 
         <!-- mini borderô: a prorrogacao inteira numa conta so -->
         <div class="rounded-lg border border-slate-200 overflow-hidden">
-          <div class="grid grid-cols-4 gap-3 p-3 bg-slate-50">
+          <div class="grid grid-cols-5 gap-3 p-3 bg-slate-50">
             <div>
               <div class="text-xs font-medium text-slate-500 mb-1">Vencimento atual</div>
               <div class="font-bold text-slate-800 h-[38px] flex items-center">{{ dataBR(vencimentoAtual) }}</div>
@@ -343,8 +365,22 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
                   <button v-else @click="form.taxa = taxaPadrao" class="font-bold text-indigo-600 hover:underline">voltar a {{ taxaPadrao }}%</button>
                 </div>
               </div>
+              <div>
+                <label for="prorrogacao-comissao" class="block text-xs font-medium text-slate-600 mb-1.5" title="Quantos pontos da taxa vão para a comissão. Ex.: 2 de 8% = 25% dos juros">Comissão</label>
+                <div class="relative">
+                  <input id="prorrogacao-comissao" type="number" step="0.01" min="0" :max="form.taxa" v-model="comissao" placeholder="0" data-campo="comissao"
+                         class="w-full border rounded-lg px-2 py-1.5 pr-11 font-bold text-slate-800 bg-white outline-none shadow-xs transition-shadow"
+                         :class="comissaoInvalida ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/15' : 'border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15'">
+                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 pointer-events-none">de {{ form.taxa }}%</span>
+                </div>
+                <div class="text-[10px] mt-0.5" data-campo="comissao-ajuda" :class="comissaoInvalida ? 'text-red-600 font-bold' : 'text-violet-700 font-medium'">
+                  <template v-if="comissaoInvalida">máximo {{ form.taxa }} (a taxa)</template>
+                  <template v-else-if="comissaoCalc.parte">{{ parteComissao }} dos juros</template>
+                  <span v-else class="text-slate-400 font-normal">opcional</span>
+                </div>
+              </div>
             </template>
-            <div v-else class="col-span-3 text-xs text-slate-500 flex items-center">Pagamento parcial: o vencimento continua o mesmo e não há juros.</div>
+            <div v-else class="col-span-4 text-xs text-slate-500 flex items-center">Pagamento parcial: o vencimento continua o mesmo e não há juros.</div>
           </div>
 
           <div v-if="ajusteData" class="px-3 py-2 text-xs border-t"
@@ -397,6 +433,17 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
                 <button v-if="r.pago > 0" @click="pagoManual = 0" class="text-slate-400 hover:underline">nada agora</button>
               </div>
             </div>
+          </div>
+
+          <div v-if="comissaoCalc.valor > 0" class="px-3 py-2 border-t border-violet-100 bg-violet-50/50 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" data-campo="comissao-prorrogacao">
+            <span class="text-slate-700">Comissão de <strong class="text-violet-700 tabular-nums" data-campo="comissao-valor">{{ moeda(comissaoCalc.valor) }}</strong> ({{ parteComissao }} dos juros) sai hoje do</span>
+            <select v-model="comissaoConta" aria-label="Conta de onde a comissão sai" data-campo="comissao-conta"
+                    class="bg-white border border-slate-300 rounded px-1.5 py-1 text-[11px] font-bold text-slate-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs">
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="BB">Banco do Brasil</option>
+              <option value="Caixa">Caixa Econômica</option>
+            </select>
+            <span class="text-slate-500">— dos juros, ficam <strong class="tabular-nums text-slate-700">{{ moeda(r.juros - comissaoCalc.valor) }}</strong> para a empresa.</span>
           </div>
 
           <div v-if="dividido && r.pago > 0" class="p-3 border-t border-slate-200 bg-slate-50/50">

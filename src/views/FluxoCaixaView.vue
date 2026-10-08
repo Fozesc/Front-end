@@ -112,6 +112,8 @@ const vinculoDoLancamento = computed(() => {
   const i = confirmModal.item;
   if (!i) return '';
   if (i.troca_id) return 'Esta linha faz parte de uma troca. A entrada e a saída da troca serão apagadas juntas.';
+  if (i.valor_informativo != null) return 'Esta linha é só informativa (mostra um total): não mexe no saldo. Apagar não muda nenhum valor do caixa.';
+  if (i.category === 'Comissão') return 'Esta linha é a comissão paga no dia da operação. Apagar devolve o valor ao caixa, mas a comissão continua registrada no borderô/prorrogação.';
   if (i.vale_id && i.tipo === 'entrada') return `Esta linha é um pagamento do vale #${i.vale_id}. Apagar tira o valor do que foi pago (se estava quitado, o vale volta para Em aberto).`;
   if (i.vale_id) return `Esta linha é a saída do vale #${i.vale_id}. Apagar tira só a linha do caixa: o vale continua lá. Para apagar o vale inteiro (com a saída e os pagamentos), use o botão Apagar na tela de Vales.`;
   if (i.check_id) return 'Esta linha é a baixa de um cheque. Apagar tira o dinheiro do caixa, mas o cheque continua marcado como Pago.';
@@ -185,6 +187,22 @@ const linhas = computed(() => {
     if (!l.parte) continue;
     l.primeiraDoGrupo = !vistos.has(l.grupo);
     vistos.add(l.grupo);
+  }
+
+  // linhas gravadas juntas (borderô / prorrogacao com comissao): um bloco so, na ordem em
+  // que foram gravadas (saida, comissao, juros)
+  const blocos = {};
+  linhasFinais.forEach((l, pos) => { if (l.grupo_id) (blocos[l.grupo_id] ||= []).push(pos); });
+  for (const posicoes of Object.values(blocos)) {
+    // a linha de total (informativa, de saida) vem primeiro; o resto na ordem em que foi gravado
+    const total = (l) => (l.valor_informativo != null && l.tipo === 'saida' ? 1 : 0);
+    const ordenadas = posicoes.map(p => linhasFinais[p]).sort((a, b) => (total(b) - total(a)) || a.id - b.id);
+    const bordero = ordenadas.find(l => l.category === 'Compra de Ativos');
+    const bloco = bordero ? `Borderô #${bordero.operation_id}` : 'Prorrogação';
+    posicoes.forEach((p, i) => { linhasFinais[p] = { ...ordenadas[i], bloco, primeiraDoBloco: i === 0 }; });
+  }
+  for (const l of linhasFinais) {
+    l.mostraData = l.bloco ? l.primeiraDoBloco : (!l.parte || l.primeiraDoGrupo);
   }
   return linhasFinais;
 });
@@ -322,17 +340,26 @@ const linhas = computed(() => {
             <tr v-if="loading"><td colspan="6" class="px-6 py-10 text-center"><Loader2 class="w-6 h-6 animate-spin mx-auto"/></td></tr>
             <tr v-for="item in linhas" :key="item.id"
                 class="hover:bg-slate-50 transition-colors"
-                :class="item.parte || item.troca_id ? 'bg-indigo-50/40' : ''">
+                :class="item.parte || item.troca_id || item.bloco ? 'bg-indigo-50/40' : ''">
               <td class="px-4 py-2.5 text-slate-500 tabular-nums text-[13px] whitespace-nowrap"
-                  :class="item.parte || item.troca_id ? 'border-l-[3px] border-indigo-400' : ''">
-                {{ item.parte && !item.primeiraDoGrupo ? '' : formatDate(item.data) }}
+                  :class="item.parte || item.troca_id || item.bloco ? 'border-l-[3px] border-indigo-400' : ''">
+                {{ item.mostraData ? formatDate(item.data) : '' }}
               </td>
               <td class="px-4 py-2.5 font-medium text-slate-800">
                 <div class="flex items-center gap-2">
                   <Link2 v-if="item.parte" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"
                          title="Parte de um recebimento dividido (mesmo cheque)" />
                   <ArrowLeftRight v-if="item.troca_id" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                  <span>{{ item.descricaoLimpa }}</span>
+                  <Link2 v-if="item.bloco && !item.parte" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"
+                         :title="`Lançado junto: ${item.bloco}`" />
+                  <span :class="item.valor_informativo != null ? (item.tipo === 'saida' ? 'font-semibold text-slate-900' : 'text-slate-500') : ''">{{ item.descricaoLimpa }}</span>
+                </div>
+                <div v-if="item.bloco && (item.primeiraDoBloco || item.category === 'Comissão' || item.valor_informativo != null)"
+                     class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
+                  <span v-if="item.primeiraDoBloco" class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">{{ item.bloco }}</span>
+                  <span v-if="item.category === 'Comissão'" class="px-1.5 py-px rounded-md bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100">Comissão · sai no dia</span>
+                  <span v-if="item.valor_informativo != null && item.tipo === 'saida'" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200">Total que sai do banco · soma das linhas abaixo</span>
+                  <span v-else-if="item.valor_informativo != null" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200">Informativo · não mexe no saldo</span>
                 </div>
                 <div v-if="item.troca_id" class="mt-1 text-[11px] font-medium">
                   <span class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">
@@ -359,11 +386,21 @@ const linhas = computed(() => {
                   {{ item.origem }}
                 </span>
               </td>
-              <td class="px-4 py-2.5 text-right text-emerald-600 font-semibold tabular-nums whitespace-nowrap">{{ item.tipo === 'entrada' ? formatMoney(item.valor) : '-' }}</td>
-              <td class="px-4 py-2.5 text-right text-red-600 font-semibold tabular-nums whitespace-nowrap">{{ item.tipo === 'saida' ? formatMoney(item.valor) : '-' }}</td>
+              <td class="px-4 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap"
+                  :class="item.valor_informativo != null ? 'text-slate-400 italic' : 'text-emerald-600'">
+                <template v-if="item.tipo !== 'entrada'">-</template>
+                <span v-else-if="item.valor_informativo != null" title="Só informativo: não mexe no saldo">({{ formatMoney(item.valor_informativo) }})</span>
+                <template v-else>{{ formatMoney(item.valor) }}</template>
+              </td>
+              <td class="px-4 py-2.5 text-right tabular-nums whitespace-nowrap"
+                  :class="item.valor_informativo != null ? 'text-slate-900 font-bold' : 'text-red-600 font-semibold'">
+                <template v-if="item.tipo !== 'saida'">-</template>
+                <span v-else-if="item.valor_informativo != null" title="Total que sai do banco: soma das linhas de baixo">{{ formatMoney(-item.valor_informativo) }}</span>
+                <template v-else>{{ formatMoney(item.valor) }}</template>
+              </td>
               <td class="px-4 py-2.5 text-right">
                 <div class="flex justify-end gap-0.5">
-                  <button @click="abrirModalEdicao(item)" title="Editar" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Edit2 class="w-4 h-4"/></button>
+                  <button v-if="item.valor_informativo == null" @click="abrirModalEdicao(item)" title="Editar" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Edit2 class="w-4 h-4"/></button>
                   <button @click="excluirLancamento(item)" title="Apagar" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                 </div>
               </td>
