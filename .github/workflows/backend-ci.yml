@@ -19,6 +19,10 @@ jobs:
         with:
           node-version: 20
 
+      # test_recibo_vale.mjs gera o PDF com o jspdf
+      - name: Instalar dependências
+        run: npm ci
+
       - name: Rodar os testes
         run: |
           set -e

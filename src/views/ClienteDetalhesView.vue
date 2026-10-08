@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   ArrowLeft, Printer, CreditCard, AlertTriangle, 
-  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin // Adicionei MapPin aqui
+  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote
 } from 'lucide-vue-next';
+import ClienteNotas from '../components/layout/ClienteNotas.vue';
 
 // --- SERVIÇOS ---
 import clientService from '../services/clientService';
@@ -16,6 +17,8 @@ const route = useRoute();
 const router = useRouter();
 const isPrinting = ref(false);
 const loading = ref(true);
+const aba = ref('operacoes');
+const totalNotas = ref(null);
 
 const openStatusMenuId = ref(null); 
 const expandedOps = ref([]); 
@@ -295,7 +298,23 @@ const exportarFicha = () => {
         </div>
       </div>
 
-      <div class="space-y-4">
+      <div class="flex bg-slate-100 p-1 rounded-lg gap-0.5 w-fit mb-4" role="tablist">
+        <button @click="aba = 'operacoes'" role="tab" :aria-selected="aba === 'operacoes'"
+                class="px-4 py-1.5 text-[13px] font-semibold rounded-md flex items-center gap-2 transition-all"
+                :class="aba === 'operacoes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+          <FileText class="w-4 h-4" /> Operações
+        </button>
+        <button @click="aba = 'notas'" role="tab" :aria-selected="aba === 'notas'" data-campo="aba-notas"
+                class="px-4 py-1.5 text-[13px] font-semibold rounded-md flex items-center gap-2 transition-all"
+                :class="aba === 'notas' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+          <StickyNote class="w-4 h-4" /> Notas
+          <span v-if="totalNotas" class="px-1.5 min-w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold inline-flex items-center justify-center tabular-nums">{{ totalNotas }}</span>
+        </button>
+      </div>
+
+      <ClienteNotas v-if="cliente.id" v-show="aba === 'notas'" :cliente-id="cliente.id" @total="totalNotas = $event" />
+
+      <div v-show="aba === 'operacoes'" class="space-y-4">
         <h3 class="font-semibold text-slate-900 text-base">Histórico de operações</h3>
 
         <div v-if="loading" class="text-center py-10 text-slate-400 flex flex-col items-center">

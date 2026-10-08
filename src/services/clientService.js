@@ -22,4 +22,20 @@ export default {
     merge(data) {
         return api.post('/clients/merge', data);
     },
+
+    notas(id, params) {
+        return api.get(`/clients/${id}/notas`, { params }).then(res => res.data);
+    },
+
+    criarNota(id, texto) {
+        return api.post(`/clients/${id}/notas`, { texto }).then(res => res.data);
+    },
+
+    editarNota(id, notaId, texto) {
+        return api.put(`/clients/${id}/notas/${notaId}`, { texto }).then(res => res.data);
+    },
+
+    apagarNota(id, notaId) {
+        return api.delete(`/clients/${id}/notas/${notaId}`);
+    },
 };
