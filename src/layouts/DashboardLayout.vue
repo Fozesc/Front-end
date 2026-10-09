@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   CalendarClock,
   HandCoins,
-  FileBarChart
+  FileBarChart,
+  CalendarDays
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -31,7 +32,8 @@ const secoes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Títulos', path: '/cheques', icon: Banknote },
     { name: 'Borderô', path: '/bordero', icon: Calculator },
-    { name: 'Clientes', path: '/clientes', icon: Users }
+    { name: 'Clientes', path: '/clientes', icon: Users },
+    { name: 'Calendário', path: '/calendario', icon: CalendarDays }
   ] },
   { titulo: 'Financeiro', itens: [
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },

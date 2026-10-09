@@ -181,7 +181,8 @@ const percentual = (valor) => {
             <div><div class="text-xs font-medium text-slate-500">Líquido entregue</div><div class="font-bold text-emerald-700 tabular-nums">{{ formatMoney(b.liquido_entregue) }}</div></div>
             <div><div class="text-xs font-medium text-slate-500">Juros registrado nos títulos</div><div class="font-bold tabular-nums">{{ formatMoney(b.juros_total) }}</div></div>
             <div v-if="b.comissao > 0"><div class="text-xs font-medium text-slate-500">Comissão</div><div class="font-bold text-violet-700 tabular-nums">{{ formatMoney(b.comissao_valor) }}</div>
-              <div class="text-[10px] text-slate-400">{{ b.comissao }} de {{ b.taxa_mensal }}% · {{ b.taxa_mensal > 0 ? pct(b.comissao / b.taxa_mensal * 100) : '' }} dos juros</div></div>
+              <div class="text-[10px] text-slate-400">{{ b.comissao }} de {{ b.taxa_mensal }}% · {{ b.taxa_mensal > 0 ? pct(b.comissao / b.taxa_mensal * 100) : '' }} dos juros</div>
+              <div v-if="b.comissao_vale" class="text-[10px] text-violet-700">{{ formatMoney(b.comissao_vale.valor) }} descontados do vale #{{ b.comissao_vale.vale }}</div></div>
           </div>
           <div v-if="diferencaJuros" class="mx-4 mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
             O juros registrado nos títulos está {{ formatMoney(Math.abs(diferencaJuros)) }} {{ diferencaJuros > 0 ? 'abaixo' : 'acima' }} do desconto cobrado neste borderô.
@@ -253,6 +254,7 @@ const percentual = (valor) => {
                       <div v-if="h.principal_abatido" class="text-[11px] text-slate-500">abateu {{ formatMoney(h.principal_abatido) }}</div>
                       <div v-if="h.juros_nao_pagos" class="text-[10px] text-amber-700">faltou {{ formatMoney(h.juros_nao_pagos) }} de juros</div>
                       <div v-if="h.comissao_valor" class="text-[10px] text-violet-700">comissão {{ formatMoney(h.comissao_valor) }} ({{ h.comissao_conta }})</div>
+                      <div v-if="h.vale_id" class="text-[10px] text-violet-700">{{ formatMoney(h.vale_abatido) }} abatidos no vale #{{ h.vale_id }}<template v-if="h.comissao_no_caixa"> · {{ formatMoney(h.comissao_no_caixa) }} no caixa</template></div>
                       <div v-if="h.conta" class="text-[10px] text-slate-400">{{ h.conta }} · {{ formatDate(h.data_recebimento) }}</div>
                     </td>
                     <td class="px-3 py-2 text-right tabular-nums font-bold text-slate-800 whitespace-nowrap">{{ formatMoney(h.novo_total) }}</td>

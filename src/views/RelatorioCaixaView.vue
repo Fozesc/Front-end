@@ -16,6 +16,7 @@ const atalhos = [
   { rotulo: 'Mês passado', de: () => iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)), ate: () => iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)) },
   { rotulo: 'Últimos 30 dias', de: () => iso(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30)), ate: () => iso(hoje) },
   { rotulo: 'Este ano', de: () => iso(new Date(hoje.getFullYear(), 0, 1)), ate: () => iso(hoje) },
+  { rotulo: 'Tudo', de: () => '', ate: () => '' },
 ];
 const OPCOES_CONTA = [{ id: 'todas', nome: 'Todas as contas', curto: 'Todas', icone: Wallet }, ...CONTAS.map(c => ({ ...c, id: c.id.toLowerCase() }))];
 

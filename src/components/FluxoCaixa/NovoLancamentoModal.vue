@@ -28,6 +28,15 @@ const CONTAS = [
 
 const isEdicao = computed(() => !!props.lancamento);
 const isTrocaExistente = computed(() => !!props.lancamento?.troca_id);
+// linha de borderô, titulo ou vale: valor e tipo so mudam pela tela de origem (o backend tambem recusa)
+const vinculado = computed(() => {
+  const l = props.lancamento;
+  if (!l) return '';
+  if (l.vale_id) return `do vale #${l.vale_id} (mude pela tela de Vales)`;
+  if (l.check_id) return 'de um título (mude pela tela de Títulos)';
+  if (l.operation_id) return `do borderô #${l.operation_id} (o valor vem dos títulos dele)`;
+  return '';
+});
 
 onMounted(() => {
 
@@ -88,10 +97,13 @@ const salvar = () => {
 
       <div class="p-6 space-y-5">
         
+        <div v-if="vinculado" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3" data-campo="lancamento-vinculado">
+          Este lançamento vem {{ vinculado }}: aqui dá para mudar só a descrição, a data e a conta.
+        </div>
         <div v-if="isTrocaExistente" class="flex items-center gap-2 text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
           <ArrowLeftRight class="w-4 h-4 shrink-0" /> Lançamento de troca: valor, data e descrição também são atualizados na outra linha.
         </div>
-        <div v-else class="flex bg-slate-100 p-1 rounded-lg">
+        <div v-else-if="!vinculado" class="flex bg-slate-100 p-1 rounded-lg">
           <button @click="form.tipo = 'entrada'" class="flex-1 py-2 text-sm font-bold rounded-md flex items-center justify-center gap-2 transition-all" :class="form.tipo === 'entrada' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
             <ArrowUpCircle class="w-4 h-4" /> Entrada
           </button>
@@ -111,7 +123,7 @@ const salvar = () => {
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Valor (R$)</label>
-            <input v-model="form.valor" type="number" step="0.01" class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none font-bold text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="0,00" />
+            <input v-model="form.valor" type="number" step="0.01" :disabled="!!vinculado" class="disabled:bg-slate-100 disabled:text-slate-400 w-full px-4 py-2 border border-slate-300 rounded-lg outline-none font-bold text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" placeholder="0,00" />
           </div>
           <div>
             <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Data</label>

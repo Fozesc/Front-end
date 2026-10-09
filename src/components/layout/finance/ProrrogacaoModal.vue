@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { X, CalendarClock, Save, AlertTriangle, Loader2, RotateCcw, Lock, ChevronDown, FileDown, Split } from 'lucide-vue-next';
 import checkService from '../../../services/checkService';
+import ComissaoVale from './ComissaoVale.vue';
 import PartesPagamento from './PartesPagamento.vue';
 import { partesFecham, partesParaEnviar } from '../../../utils/contasCaixa';
 import { VERSAO } from '../../../versao';
@@ -140,6 +141,10 @@ const comissaoCalc = computed(() => (prorrogar.value && !comissaoInvalida.value
   : { valor: 0, parte: 0 }));
 const parteComissao = computed(() => `${comissaoCalc.value.parte.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
+// comissao descontada de um vale (opcional): ComissaoVale mostra a lista e o resumo
+const abaterVale = ref(false);
+const valeId = ref(null);
+
 watch([() => r.value.saldoBase, prorrogar, () => form.value.new_date, () => form.value.data_base,
        () => form.value.taxa, () => form.value.dias_comp, () => form.value.iof],
       () => { jurosManual.value = null; });
@@ -166,6 +171,8 @@ const erros = computed(() => {
     if (!Number.isInteger(d) || d < 0 || d > 30) add('Dias de compensação inválidos.', true);
     if (Number.isNaN(r.value.juros) || r.value.juros < 0) add('Juros inválidos.', true);
     if (comissaoInvalida.value) add(`A comissão tem que ficar entre 0 e a taxa (${form.value.taxa}%).`);
+    if (abaterVale.value && !(comissaoCalc.value.valor > 0)) add('Preencha a comissão para descontar do vale.');
+    else if (abaterVale.value && !valeId.value) add('Escolha o vale que vai receber a comissão.');
   } else if (!r.value.pago && !r.value.ajuste) {
     add('Informe o valor pago.');
   }
@@ -180,6 +187,7 @@ watch(erros, (lista) => {
 const avisoCalculo = computed(() => erros.value.find(e => /Prazo longo|depois do vencimento|maior que o devido|quita o título/.test(e.msg))?.msg);
 
 const salvar = async () => {
+  if (loading.value) return;
   errorMessage.value = '';
   if (erros.value.length) {
     errorMessage.value = erros.value[0].msg;
@@ -203,7 +211,8 @@ const salvar = async () => {
       ...(saldoManual.value !== null ? { saldo_base: r.value.saldoBase } : {}),
       notes: form.value.notes,
       ...(comissaoCalc.value.valor > 0
-        ? { comissao: Number(comissao.value), comissao_base: baseComissao.value, comissao_conta: comissaoConta.value }
+        ? { comissao: Number(comissao.value), comissao_base: baseComissao.value, comissao_conta: comissaoConta.value,
+            ...(abaterVale.value && valeId.value ? { vale_id: valeId.value } : {}) }
         : {}),
       ...(r.value.ajuste ? { senha: form.value.senha } : {})
     });
@@ -369,14 +378,13 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
                 <label for="prorrogacao-comissao" class="block text-xs font-medium text-slate-600 mb-1.5" title="Quantos pontos da taxa vão para a comissão. Ex.: 2 de 8% = 25% dos juros">Comissão</label>
                 <div class="relative">
                   <input id="prorrogacao-comissao" type="number" step="0.01" min="0" :max="form.taxa" v-model="comissao" placeholder="0" data-campo="comissao"
-                         class="w-full border rounded-lg px-2 py-1.5 pr-11 font-bold text-slate-800 bg-white outline-none shadow-xs transition-shadow"
+                         class="w-full border rounded-lg px-2 py-1.5 font-bold text-slate-800 bg-white outline-none shadow-xs transition-shadow"
                          :class="comissaoInvalida ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/15' : 'border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15'">
-                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 pointer-events-none">de {{ form.taxa }}%</span>
                 </div>
                 <div class="text-[10px] mt-0.5" data-campo="comissao-ajuda" :class="comissaoInvalida ? 'text-red-600 font-bold' : 'text-violet-700 font-medium'">
                   <template v-if="comissaoInvalida">máximo {{ form.taxa }} (a taxa)</template>
-                  <template v-else-if="comissaoCalc.parte">{{ parteComissao }} dos juros</template>
-                  <span v-else class="text-slate-400 font-normal">opcional</span>
+                  <template v-else-if="comissaoCalc.parte">de {{ form.taxa }}% · {{ parteComissao }} dos juros</template>
+                  <span v-else class="text-slate-400 font-normal">pontos de {{ form.taxa }}% · opcional</span>
                 </div>
               </div>
             </template>
@@ -435,15 +443,18 @@ ${form.value.notes ? `<div class="obs"><strong>Observação:</strong> ${esc(form
             </div>
           </div>
 
-          <div v-if="comissaoCalc.valor > 0" class="px-3 py-2 border-t border-violet-100 bg-violet-50/50 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" data-campo="comissao-prorrogacao">
-            <span class="text-slate-700">Comissão de <strong class="text-violet-700 tabular-nums" data-campo="comissao-valor">{{ moeda(comissaoCalc.valor) }}</strong> ({{ parteComissao }} dos juros) sai hoje do</span>
-            <select v-model="comissaoConta" aria-label="Conta de onde a comissão sai" data-campo="comissao-conta"
-                    class="bg-white border border-slate-300 rounded px-1.5 py-1 text-[11px] font-bold text-slate-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs">
-              <option value="Dinheiro">Dinheiro</option>
-              <option value="BB">Banco do Brasil</option>
-              <option value="Caixa">Caixa Econômica</option>
-            </select>
-            <span class="text-slate-500">— dos juros, ficam <strong class="tabular-nums text-slate-700">{{ moeda(r.juros - comissaoCalc.valor) }}</strong> para a empresa.</span>
+          <div v-if="prorrogar" class="px-3 py-2 border-t border-violet-100 bg-violet-50/50 space-y-2 text-xs" data-campo="comissao-prorrogacao">
+            <div v-if="comissaoCalc.valor > 0" class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="text-slate-700">Comissão de <strong class="text-violet-700 tabular-nums" data-campo="comissao-valor">{{ moeda(comissaoCalc.valor) }}</strong> ({{ parteComissao }} dos juros) {{ abaterVale && valeId ? 'o que passar do vale sai hoje do' : 'sai hoje do' }}</span>
+              <select v-model="comissaoConta" aria-label="Conta de onde a comissão sai" data-campo="comissao-conta"
+                      class="bg-white border border-slate-300 rounded px-1.5 py-1 text-[11px] font-bold text-slate-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs">
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="BB">Banco do Brasil</option>
+                <option value="Caixa">Caixa Econômica</option>
+              </select>
+              <span class="text-slate-500">— dos juros, ficam <strong class="tabular-nums text-slate-700">{{ moeda(r.juros - comissaoCalc.valor) }}</strong> para a empresa.</span>
+            </div>
+            <ComissaoVale v-model="valeId" v-model:ativo="abaterVale" :comissao="comissaoCalc.valor" :conta="NOMES_CONTA[comissaoConta]" />
           </div>
 
           <div v-if="dividido && r.pago > 0" class="p-3 border-t border-slate-200 bg-slate-50/50">

@@ -62,7 +62,8 @@ export async function gerarRecibo({ empresa = {}, vale, pagamento = null }) {
     });
     doc.setDrawColor(0);
     y += 7;
-    paragrafo(`Lançamento no caixa: ${pagamento.descricao} (${pagamento.conta})`, 9.5, 2);
+    paragrafo(pagamento.abatimento ? `Descontado da comissão: ${pagamento.descricao}`
+      : `Lançamento no caixa: ${pagamento.descricao} (${pagamento.conta})`, 9.5, 2);
   } else {
     paragrafo(`Eu, ${LINHA_NOME}, declaro que recebi de ${nomeEmpresa} a quantia de ${moeda(vale.valor)} `
       + `a título de vale (adiantamento) nº ${vale.id}, em ${dataBR(vale.data)}, comprometendo-me a devolvê-la.`);
