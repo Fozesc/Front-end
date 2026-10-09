@@ -7,7 +7,7 @@ import DetalhesLancamentoModal from '../components/FluxoCaixa/DetalhesLancamento
 
 import { 
   Building, Banknote, Plus, Trash2, Edit2, Settings, ArrowDownCircle,
-  Loader2, TrendingUp, AlertTriangle, Link2, ArrowLeftRight
+  Loader2, TrendingUp, AlertTriangle, Link2, ArrowLeftRight, FileBarChart
 } from 'lucide-vue-next';
 
 import transactionService from '../services/transactionService';
@@ -268,6 +268,9 @@ const linhas = computed(() => {
         <p class="text-slate-500 text-sm mt-1">Saldos por conta, dinheiro na rua e lançamentos.</p>
       </div>
       <div class="flex gap-2.5">
+        <router-link to="/relatorio-caixa" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
+          <FileBarChart class="w-4 h-4 text-slate-500" /> Relatório
+        </router-link>
         <button @click="showConfigModal = true" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
           <Settings class="w-4 h-4 text-slate-500" /> Capital social
         </button>
