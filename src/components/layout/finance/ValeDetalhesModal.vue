@@ -197,7 +197,10 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
                   <tr v-for="m in movimentos" :key="m.id" data-campo="vale-pagamento">
                     <td class="px-4 py-3 text-slate-500 tabular-nums text-[13px] whitespace-nowrap">{{ dataBR(m.data) }}</td>
                     <td class="px-4 py-3 text-slate-700"><span class="inline-flex items-center gap-2"><ArrowDownLeft class="w-4 h-4 text-emerald-500 flex-shrink-0" /> {{ m.descricao }}</span></td>
-                    <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap" :class="ESTILO[m.conta]?.chip">{{ nomeConta(m.conta) }}</span></td>
+                    <td class="px-4 py-3">
+                      <span v-if="m.abatimento" class="px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap bg-violet-50 text-violet-700 border-violet-200" title="Descontado da comissão">Comissão</span>
+                      <span v-else class="px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap" :class="ESTILO[m.conta]?.chip">{{ nomeConta(m.conta) }}</span>
+                    </td>
                     <td class="px-4 py-3 text-right tabular-nums font-semibold text-emerald-600 whitespace-nowrap">+ {{ dinheiro(m.valor) }}</td>
                     <td class="px-4 py-3 text-right tabular-nums text-slate-500 whitespace-nowrap">{{ dinheiro(m.saldoApos) }}</td>
                     <td class="px-2 py-3 text-right whitespace-nowrap">
@@ -223,9 +226,9 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
 
           <div v-if="desfazer.item" class="bg-red-50/60 border border-red-200 rounded-xl p-4 space-y-3">
             <div class="text-sm text-slate-800">
-              Desfazer o pagamento de <strong class="tabular-nums">{{ dinheiro(desfazer.item.valor) }}</strong> de {{ dataBR(desfazer.item.data) }}
-              ({{ nomeConta(desfazer.item.conta) }})?
-              <div class="text-xs text-slate-600 mt-1">O valor sai do caixa e volta a ficar devendo no vale<template v-if="v.status === 'Pago'">, que volta para Em aberto</template>. Fica registrado na Auditoria.</div>
+              Desfazer o {{ desfazer.item.abatimento ? 'desconto' : 'pagamento' }} de <strong class="tabular-nums">{{ dinheiro(desfazer.item.valor) }}</strong> de {{ dataBR(desfazer.item.data) }}
+              ({{ desfazer.item.abatimento ? 'comissão' : nomeConta(desfazer.item.conta) }})?
+              <div class="text-xs text-slate-600 mt-1"><template v-if="desfazer.item.abatimento">O valor volta a ficar devendo no vale e a comissão fica como paga inteira em dinheiro (o desconto sai do caixa)</template><template v-else>O valor sai do caixa e volta a ficar devendo no vale</template><template v-if="v.status === 'Pago'">, que volta para Em aberto</template>. Fica registrado na Auditoria.</div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2">
               <div class="relative flex-1">

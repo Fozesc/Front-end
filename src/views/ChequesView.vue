@@ -8,13 +8,14 @@ import ChequeDetalhesModal from '../components/layout/finance/ChequeDetalhesModa
 import ProrrogacaoModal from '../components/layout/finance/ProrrogacaoModal.vue'; 
 import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
 import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
+import ExcluirChequeModal from '../components/layout/finance/ExcluirChequeModal.vue';
 import api from '../services/api';
 
 import { 
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock, AlertTriangle, Pencil,
+  Edit, Download, CalendarClock, Pencil,
   HandCoins
 } from 'lucide-vue-next';
 
@@ -36,6 +37,8 @@ const showEditModal = ref(false);
 const chequeParaReceber = ref(null);
 // troca de status pelo botao da lista (Devolvido, Juridico...): { cheque, status }
 const mudancaStatus = ref(null);
+// cheque a apagar: o modal mostra antes o que muda no caixa e pede a senha
+const chequeParaExcluir = ref(null);
 
 
 const openStatusMenuId = ref(null);
@@ -77,22 +80,6 @@ const filters = reactive({
 const statusOptions = ['Aguardando', 'Pago', 'Atrasado', 'Devolvido', 'Juridico'];
 // o banco grava 'Juridico'; na tela vai com acento
 const rotuloStatus = (s) => (s === 'Juridico' ? 'Jurídico' : s);
-
-const confirmModal = reactive({
-  visible: false,
-  title: '',
-  message: '',
-  action: null,
-  type: 'danger'
-});
-
-const openConfirm = (title, message, actionCallback, type = 'danger') => {
-  confirmModal.title = title;
-  confirmModal.message = message;
-  confirmModal.action = actionCallback;
-  confirmModal.type = type;
-  confirmModal.visible = true;
-};
 
 const carregarDados = async () => {
   loading.value = true;
@@ -218,12 +205,6 @@ const abrirEdicaoCheque = (cheque) => {
   showEditModal.value = true;
 };
 
-const deletarCheque = (id) => {
-  openConfirm('Excluir Cheque', 'Esta ação não pode ser desfeita.', async () => {
-    try { await checkService.delete(id); carregarDados(); } catch (e) { alert("Erro ao excluir."); }
-  }, 'danger');
-};
-
 const abrirDetalhes = (cheque) => { selectedCheque.value = cheque; showDetailsModal.value = true; };
 const hojeISO = new Date().toLocaleDateString('en-CA');
 // dias de atraso de quem ainda deve (o "Atrasado" da lista ja vem do backend)
@@ -275,28 +256,8 @@ const exportarTela = () => {
                       @close="chequeParaReceber = null" @confirmado="carregarDados" />
     <StatusChequeModal v-if="mudancaStatus" :cheque="mudancaStatus.cheque" :novoStatus="mudancaStatus.status"
                        :taxaMulta="taxaMulta" @close="mudancaStatus = null" @confirmado="carregarDados" />
-
-    <div v-if="confirmModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="confirmModal.visible = false"></div>
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm relative z-10 p-6 text-center animate-scale-in">
-        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"
-             :class="confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' : (confirmModal.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600')">
-          <AlertTriangle v-if="confirmModal.type !== 'success'" class="h-6 w-6" />
-          <CheckSquare v-else class="h-6 w-6" />
-        </div>
-        <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ confirmModal.title }}</h3>
-        <p class="text-slate-500 mb-6 text-sm">{{ confirmModal.message }}</p>
-
-        <div class="flex gap-3 justify-center">
-          <button @click="confirmModal.visible = false" class="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg shadow-xs hover:bg-slate-50 transition-colors w-full text-sm">Cancelar</button>
-          <button @click="() => { confirmModal.action(); confirmModal.visible = false; }" 
-                  class="px-4 py-2.5 text-white font-semibold rounded-lg shadow-xs transition-colors w-full text-sm"
-                  :class="confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : (confirmModal.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600')">
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
+    <ExcluirChequeModal v-if="chequeParaExcluir" :cheque="chequeParaExcluir"
+                        @close="chequeParaExcluir = null" @excluido="chequeParaExcluir = null; carregarDados()" />
 
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -427,7 +388,7 @@ const exportarTela = () => {
                             class="p-1.5 rounded-md text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"><HandCoins class="w-4 h-4"/></button>
                     <button v-if="cheque.status !== 'Pago'" @click.stop="abrirProrrogacao(cheque)" title="Prorrogar / receber parte" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><CalendarClock class="w-4 h-4"/></button>
                     <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-1.5 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil class="w-4 h-4"/></button>
-                    <button @click.stop="deletarCheque(cheque.id)" title="Excluir" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
+                    <button @click.stop="chequeParaExcluir = cheque" title="Excluir" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                   </div>
                 </td>
               </tr>

@@ -7,6 +7,9 @@ import {
   FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote
 } from 'lucide-vue-next';
 import ClienteNotas from '../components/layout/ClienteNotas.vue';
+import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
+import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
+import api from '../services/api';
 
 // --- SERVIÇOS ---
 import clientService from '../services/clientService';
@@ -24,6 +27,11 @@ const openStatusMenuId = ref(null);
 const expandedOps = ref([]); 
 
 const statusOptions = ['Aguardando', 'Pago', 'Devolvido', 'Atrasado', 'Juridico'];
+// mudar status passa pelas mesmas telas da lista de Titulos: Receber (conta, imposto, partes)
+// e a de status (multa da devolucao e conta) - senao o dinheiro caia sempre no Dinheiro
+const chequeParaReceber = ref(null);
+const mudancaStatus = ref(null);
+const taxaMulta = ref(2);
 
 const cliente = ref({
   id: null,
@@ -106,9 +114,8 @@ const carregarTudo = async () => {
       };
     });
 
-    if (operacoesDoCliente.value.length > 0) {
-      expandedOps.value.push(operacoesDoCliente.value[0].id);
-    }
+    const primeira = operacoesDoCliente.value[0]?.id;
+    if (primeira && !expandedOps.value.includes(primeira)) expandedOps.value.push(primeira);
 
   } catch (error) {
     console.error("Erro ao carregar ficha:", error);
@@ -119,6 +126,7 @@ const carregarTudo = async () => {
 
 onMounted(() => {
   carregarTudo();
+  api.get('/settings/').then(({ data }) => { taxaMulta.value = Number(data?.fine_rate ?? 2); }).catch(() => {});
   document.addEventListener('click', closeStatusMenu);
 });
 
@@ -137,21 +145,15 @@ const closeStatusMenu = () => {
   openStatusMenuId.value = null;
 };
 
-const alterarStatus = async (cheque, novoStatus, operacaoPai) => {
+const alterarStatus = async (cheque, novoStatus) => {
+  openStatusMenuId.value = null;
+  if (cheque.status === novoStatus) return;
   try {
-    await checkService.updateStatus(cheque.id, novoStatus);
-    cheque.status = novoStatus; 
-    
-    const hoje = new Date().toISOString().split('T')[0];
-    cheque.isAtrasado = (novoStatus === 'Atrasado') || (novoStatus === 'Aguardando' && cheque.vencimento < hoje);
-
-    const todosPagos = operacaoPai.cheques.every(c => ['Pago', 'Compensado'].includes(c.status));
-    operacaoPai.statusGeral = todosPagos ? 'Concluída' : 'Em Aberto';
-    operacaoPai.temAtraso = operacaoPai.cheques.some(c => c.isAtrasado);
-
-    openStatusMenuId.value = null;
+    const completo = await checkService.detalhes(cheque.id);
+    if (novoStatus === 'Pago') chequeParaReceber.value = completo;
+    else mudancaStatus.value = { cheque: completo, status: novoStatus };
   } catch (error) {
-    alert("Erro ao atualizar status.");
+    alert("Não foi possível abrir o título.");
   }
 };
 
@@ -162,7 +164,8 @@ const totalEmAbertoGlobal = computed(() => {
   operacoesDoCliente.value.forEach(op => {
     if (op.cheques) {
       op.cheques.forEach(c => {
-        if (['Aguardando', 'Atrasado', 'Aberto'].includes(c.status)) {
+        // tudo que nao foi pago, igual ao limite que o borderô confere
+        if (!['Pago', 'Compensado'].includes(c.status)) {
           total += c.valor;
         }
       });
@@ -225,6 +228,10 @@ const exportarFicha = () => {
 
 <template>
   <DashboardLayout>
+    <RecebimentoModal v-if="chequeParaReceber" :cheque="chequeParaReceber"
+                      @close="chequeParaReceber = null" @confirmado="carregarTudo" />
+    <StatusChequeModal v-if="mudancaStatus" :cheque="mudancaStatus.cheque" :novoStatus="mudancaStatus.status"
+                       :taxaMulta="taxaMulta" @close="mudancaStatus = null" @confirmado="carregarTudo" />
     <div class="print:hidden">
       
       <div class="flex justify-between items-center mb-6">
@@ -397,7 +404,7 @@ const exportarFicha = () => {
 
                     <div v-if="openStatusMenuId === cheque.id" class="absolute right-0 mt-1.5 w-36 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden text-left animate-scale-in p-1">
                       <div v-for="opt in statusOptions" :key="opt" 
-                           @click.stop="alterarStatus(cheque, opt, op)"
+                           @click.stop="alterarStatus(cheque, opt)"
                            class="px-2.5 py-1.5 text-[13px] font-medium rounded-md hover:bg-slate-100 cursor-pointer text-slate-700 flex justify-between items-center">
                         {{ opt }}
                         <Check v-if="cheque.status === opt" class="w-3 h-3 text-emerald-500" />

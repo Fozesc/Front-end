@@ -59,6 +59,7 @@ const fetchDashboard = async () => {
   loading.value = true;
   try {
     const { data } = await api.get(`/dashboard?period=${chartPeriod.value}`);
+    if (!data?.kpis) throw new Error('resposta inesperada do servidor');
     kpis.value = data.kpis;
     proximosVencimentos.value = data.upcoming;
     vencemHoje.value = data.vencem_hoje || { data: '', quantidade: 0, total: 0 };

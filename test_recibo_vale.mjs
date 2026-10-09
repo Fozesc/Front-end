@@ -25,8 +25,12 @@ assert.ok(pag.includes('R$ 120,50') && pag.includes('R$ 279,50') && pag.includes
 const quitado = (await gerarRecibo({ empresa: {}, vale, pagamento: { ...pagamento, saldoApos: 0 } })).output();
 assert.ok(!quitado.includes('pagamento parcial') && quitado.includes('Empresa'), 'quitação e empresa sem cadastro');
 
+const abatido = (await gerarRecibo({ empresa, vale, pagamento: { ...pagamento, abatimento: true } })).output();
+assert.ok(abatido.includes('Descontado da comiss') && !abatido.includes('Lançamento no caixa') && !pag.includes('Descontado da comiss'),
+  'desconto com a comissão aparece no recibo');
+
 if (process.argv[2]) {
   writeFileSync(`${process.argv[2]}/recibo-saida.pdf`, Buffer.from(await (await gerarRecibo({ empresa, vale })).output('arraybuffer')));
   writeFileSync(`${process.argv[2]}/recibo-pagamento.pdf`, Buffer.from(await (await gerarRecibo({ empresa, vale, pagamento })).output('arraybuffer')));
 }
-console.log('OK: recibo de vale e de pagamento em PDF, valores, nome em branco para assinar, quitação e empresa sem cadastro.');
+console.log('OK: recibo de vale e de pagamento em PDF, valores, nome em branco para assinar, quitação, empresa sem cadastro e desconto com a comissão.');

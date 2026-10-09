@@ -114,6 +114,7 @@ const vinculoDoLancamento = computed(() => {
   if (i.troca_id) return 'Esta linha faz parte de uma troca. A entrada e a saída da troca serão apagadas juntas.';
   if (i.valor_informativo != null) return 'Esta linha é só informativa (mostra um total): não mexe no saldo. Apagar não muda nenhum valor do caixa.';
   if (i.category === 'Comissão') return 'Esta linha é a comissão paga no dia da operação. Apagar devolve o valor ao caixa, mas a comissão continua registrada no borderô/prorrogação.';
+  if (i.vale_id && i.tipo === 'entrada' && (i.operation_id || i.check_id)) return `Esta linha é a parte da comissão descontada no vale #${i.vale_id}. Apagar desfaz o desconto: o vale volta a dever esse valor e a comissão fica como paga inteira em dinheiro.`;
   if (i.vale_id && i.tipo === 'entrada') return `Esta linha é um pagamento do vale #${i.vale_id}. Apagar tira o valor do que foi pago (se estava quitado, o vale volta para Em aberto).`;
   if (i.vale_id) return `Esta linha é a saída do vale #${i.vale_id}. Apagar tira só a linha do caixa: o vale continua lá. Para apagar o vale inteiro (com a saída e os pagamentos), use o botão Apagar na tela de Vales.`;
   if (i.check_id) return 'Esta linha é a baixa de um cheque. Apagar tira o dinheiro do caixa, mas o cheque continua marcado como Pago.';
@@ -357,11 +358,12 @@ const linhas = computed(() => {
                          :title="`Lançado junto: ${item.bloco}`" />
                   <span :class="item.valor_informativo != null ? (item.tipo === 'saida' ? 'font-semibold text-slate-900' : 'text-slate-500') : ''">{{ item.descricaoLimpa }}</span>
                 </div>
-                <div v-if="item.bloco && (item.primeiraDoBloco || item.category === 'Comissão' || item.valor_informativo != null)"
+                <div v-if="item.bloco && (item.primeiraDoBloco || item.category === 'Comissão' || item.vale_id || item.valor_informativo != null)"
                      class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
                   <span v-if="item.primeiraDoBloco" class="px-1.5 py-px rounded-md bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-100">{{ item.bloco }}</span>
-                  <span v-if="item.category === 'Comissão'" class="px-1.5 py-px rounded-md bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100">Comissão · sai no dia</span>
+                  <span v-if="item.category === 'Comissão'" class="px-1.5 py-px rounded-md bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100">Comissão</span>
                   <span v-if="item.valor_informativo != null && item.tipo === 'saida'" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200">Total que sai do banco · soma das linhas abaixo</span>
+                  <span v-if="item.vale_id" class="px-1.5 py-px rounded-md bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100">Desconto no vale #{{ item.vale_id }} · comissão</span>
                   <span v-else-if="item.valor_informativo != null" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200">Informativo · não mexe no saldo</span>
                 </div>
                 <div v-if="item.troca_id" class="mt-1 text-[11px] font-medium">

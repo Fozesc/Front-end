@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router';
 import operationService from '../services/operationService';
 import checkService from '../services/checkService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
+import ComissaoVale from '../components/layout/finance/ComissaoVale.vue';
 import api from '../services/api';
 import { motivoNaoUtil, proximoDiaUtil } from '../utils/diasUteis';
 import { CONTAS } from '../utils/contasCaixa';
@@ -193,6 +194,10 @@ const comissaoInvalida = computed(() => {
 const comissao = computed(() => (comissaoInvalida.value ? { valor: 0, parte: 0 } : calcularComissao({
   juros: totais.value.juros, comissao: header.comissao, taxaMensal: header.taxaMensal
 })));
+// comissao descontada de um vale (opcional): so o que passar do vale sai do caixa
+const abaterVale = ref(false);
+const valeId = ref(null);
+const comissaoVale = ref(null);
 const parteDosJuros = computed(() =>
   `${comissao.value.parte.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
@@ -317,7 +322,23 @@ const exportarBordero = async () => {
   window.print();
 };
 
+const novoBordero = () => {
+  modalState.visible = false;
+  itens.value = [];
+  adicionarLinha();
+  gerador.valorAlvo = 0;
+  header.clienteId = null; header.clienteNome = '';
+  header.clienteDocumento = ''; header.clienteTelefone = '';
+  header.clienteLimite = 0; header.clienteDivida = 0;
+  header.comissao = 0;
+  abaterVale.value = false;
+  valeId.value = null;
+  lastOperationId.value = null;
+  fetchNextId();
+};
+
 const verificarLimiteESalvar = () => {
+  if (loading.value) return;
   if (!header.clienteId) return showPopup('Atenção', 'Selecione um cliente válido.', 'error');
   if (!header.emitenteNome) return showPopup('Atenção', 'Informe o emitente.', 'error');
   if (itens.value.length === 0 || totais.value.bruto <= 0) return showPopup('Atenção', 'Borderô vazio.', 'error');
@@ -325,6 +346,8 @@ const verificarLimiteESalvar = () => {
   const zerado = itens.value.findIndex(i => !(Number(i.valor) > 0) || !(Number(i.liquido) > 0));
   if (zerado >= 0) return showPopup('Atenção', `O cheque ${zerado + 1} está com valor ou líquido zerado/negativo (juros maiores que o cheque). Corrija antes de efetivar.`, 'error');
   if (comissaoInvalida.value) return showPopup('Atenção', `A comissão tem que ficar entre 0 e a taxa (${header.taxaMensal}%).`, 'error');
+  if (abaterVale.value && !(comissao.value.valor > 0)) return showPopup('Atenção', 'Preencha a comissão para descontar do vale.', 'error');
+  if (abaterVale.value && !valeId.value) return showPopup('Atenção', 'Escolha o vale que vai receber a comissão.', 'error');
 
   const novoRisco = totais.value.bruto;
   const dividaTotalFutura = header.clienteDivida + novoRisco;
@@ -354,6 +377,7 @@ const processarSalvamento = async () => {
       total_net: totais.value.liquido, // valor realmente emprestado (o que sai do caixa) = face - juros - IOF
       notes: header.observacao,
       comissao: Number(header.comissao) || 0,
+      ...(abaterVale.value && valeId.value ? { vale_id: valeId.value } : {}),
       // o servidor grava exatamente estes centavos (depois de conferir com a mesma conta)
       iof_enabled: header.iofEnabled,
       iof_base: header.iofBase,
@@ -366,24 +390,14 @@ const processarSalvamento = async () => {
     };
     const resposta = await operationService.create(payload);
 
-    lastOperationId.value = resposta.id; 
-
-    await exportarBordero(); 
-    
+    lastOperationId.value = resposta.id;
+    // a tela so limpa quando o aviso fecha: tem navegador (Safari) que monta a impressao
+    // depois, e ai imprimia a tela ja limpa com o aviso por cima
     showPopup('Sucesso!', `Operação #${resposta.id} realizada!\nLíquido: ${formatCurrency(resposta.total_net)}`
-      + (resposta.comissao_valor > 0 ? `\nComissão: ${formatCurrency(resposta.comissao_valor)}` : ''));
-    
-    itens.value = [];
-    adicionarLinha();
-    gerador.valorAlvo = 0;
-    header.clienteId = null; header.clienteNome = '';
-    header.clienteDocumento = ''; header.clienteTelefone = '';
-    header.clienteLimite = 0; header.clienteDivida = 0;
-    header.comissao = 0;
-
-    lastOperationId.value = null; 
-    fetchNextId(); 
-
+      + (resposta.comissao_valor > 0 ? `\nComissão: ${formatCurrency(resposta.comissao_valor)}` : '')
+      + (resposta.comissao_valor > 0 && abaterVale.value && valeId.value
+        ? ` · ${formatCurrency(comissaoVale.value?.noVale)} descontados do vale #${valeId.value}` : ''));
+    await exportarBordero();
   } catch (error) {
     showPopup('Erro', error.response?.data?.error || "Erro ao salvar.", 'error');
   } finally {
@@ -395,7 +409,7 @@ const processarSalvamento = async () => {
 <template>
   <DashboardLayout>
 
-    <div v-if="limitModal.visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div v-if="limitModal.visible" class="print:hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 p-6 text-center animate-scale-in">
         <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle class="w-6 h-6 text-amber-600" /></div>
@@ -414,14 +428,18 @@ const processarSalvamento = async () => {
       </div>
     </div>
 
-    <div v-if="modalState.visible" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+    <div v-if="modalState.visible" class="print:hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
       <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center animate-scale-in">
         <div :class="['mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4', modalState.type === 'error' ? 'bg-red-100' : 'bg-emerald-100']">
           <CheckCircle v-if="modalState.type === 'success'" class="h-6 w-6 text-emerald-600" /><AlertTriangle v-else class="h-6 w-6 text-red-600" />
         </div>
         <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ modalState.title }}</h3>
         <p class="text-slate-500 text-sm mb-6 whitespace-pre-line">{{ modalState.message }}</p>
-        <button @click="modalState.visible = false" :class="['w-full h-10 px-4 rounded-md text-white font-semibold text-sm shadow-xs', modalState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700']">Entendido</button>
+        <div v-if="lastOperationId" class="flex gap-3">
+          <button @click="exportarBordero" data-campo="imprimir-efetivado" class="flex-1 h-10 px-4 bg-white border border-slate-300 text-slate-700 font-semibold text-sm rounded-md shadow-xs hover:bg-slate-50 flex items-center justify-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Imprimir</button>
+          <button @click="novoBordero" data-campo="novo-bordero" class="flex-1 h-10 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs">Novo borderô</button>
+        </div>
+        <button v-else @click="modalState.visible = false" :class="['w-full h-10 px-4 rounded-md text-white font-semibold text-sm shadow-xs', modalState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700']">Entendido</button>
       </div>
     </div>
 
@@ -501,12 +519,12 @@ const processarSalvamento = async () => {
               <div class="relative">
                 <input id="bordero-comissao" type="number" step="0.01" min="0" :max="header.taxaMensal" v-model="header.comissao" placeholder="0"
                        data-campo="comissao" aria-describedby="bordero-comissao-ajuda" :aria-invalid="comissaoInvalida"
-                       :class="[campo, 'pr-14 font-semibold tabular-nums', comissaoInvalida ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : '']" />
-                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 pointer-events-none">de {{ virgula(header.taxaMensal) }}%</span>
+                       :class="[campo, 'font-semibold tabular-nums', comissaoInvalida ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : '']" />
               </div>
               <p id="bordero-comissao-ajuda" class="text-[11px] font-medium mt-1" :class="comissaoInvalida ? 'text-red-600' : 'text-violet-700'">
                 <template v-if="comissaoInvalida">Máximo {{ virgula(header.taxaMensal) }} (a taxa)</template>
-                <template v-else-if="comissao.parte">{{ parteDosJuros }} dos juros · sai do caixa hoje</template>
+                <template v-else-if="comissao.parte">de {{ virgula(header.taxaMensal) }}% · {{ parteDosJuros }} dos juros</template>
+                <span v-else class="text-slate-400 font-normal">pontos de {{ virgula(header.taxaMensal) }}%</span>
               </p>
             </div>
             <div>
@@ -530,6 +548,10 @@ const processarSalvamento = async () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div class="rounded-md border border-violet-100 bg-violet-50/50 px-3 py-2.5">
+            <ComissaoVale ref="comissaoVale" v-model="valeId" v-model:ativo="abaterVale" :comissao="comissao.valor" :conta="nomeConta(header.contaSaida)" />
           </div>
 
           <div>

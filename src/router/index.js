@@ -13,6 +13,7 @@ import AuditView from '../views/AuditView.vue'
 import HistoricoView from '../views/HistoricoView.vue'
 import ValesView from '../views/ValesView.vue'
 import RelatorioCaixaView from '../views/RelatorioCaixaView.vue'
+import CalendarioView from '../views/CalendarioView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -86,6 +87,12 @@ const router = createRouter({
       path: '/relatorio-caixa',
       name: 'relatorio-caixa',
       component: RelatorioCaixaView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/calendario',
+      name: 'calendario',
+      component: CalendarioView,
       meta: { requiresAuth: true }
     }
   ]

@@ -22,8 +22,12 @@ export default {
   prorrogate(id, payload) {
     return api.post(`/checks/${id}/prorrogate`, payload).then(res => res.data);
   },
-  delete(id) {
-    return api.delete(`/checks/${id}`).then(res => res.data);
+  // o que apagar o titulo muda no caixa (nada e' gravado)
+  previaExclusao(id) {
+    return api.get(`/checks/${id}/exclusao`).then(res => res.data);
+  },
+  delete(id, senha) {
+    return api.delete(`/checks/${id}`, { data: { senha } }).then(res => res.data);
   },
   // Edicao de nome/datas: o backend exige a senha de quem esta logado no corpo.
   update(id, data) {
