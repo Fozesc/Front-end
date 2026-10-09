@@ -18,7 +18,8 @@ import {
   ChevronRight,
   ShieldCheck,
   CalendarClock,
-  HandCoins
+  HandCoins,
+  FileBarChart
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -34,6 +35,7 @@ const secoes = [
   ] },
   { titulo: 'Financeiro', itens: [
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
+    { name: 'Relatório do Caixa', path: '/relatorio-caixa', icon: FileBarChart },
     { name: 'Vales', path: '/vales', icon: HandCoins },
     { name: 'Histórico Mensal', path: '/historico', icon: CalendarClock }
   ] },
