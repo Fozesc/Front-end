@@ -4,12 +4,13 @@ import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   ArrowLeft, Printer, CreditCard, AlertTriangle, 
-  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote
+  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote, FileDown
 } from 'lucide-vue-next';
 import ClienteNotas from '../components/layout/ClienteNotas.vue';
 import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
 import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
 import api from '../services/api';
+import { baixarRelatorioClientePdf } from '../utils/relatorioClientePdf';
 
 // --- SERVIÇOS ---
 import clientService from '../services/clientService';
@@ -32,6 +33,8 @@ const statusOptions = ['Aguardando', 'Pago', 'Devolvido', 'Atrasado', 'Juridico'
 const chequeParaReceber = ref(null);
 const mudancaStatus = ref(null);
 const taxaMulta = ref(2);
+const empresa = ref({ nome: 'Fozesc', cnpj: null });
+const gerandoPdf = ref(false);
 
 const cliente = ref({
   id: null,
@@ -90,12 +93,15 @@ const carregarTudo = async () => {
 
       const chequesFormatados = listaCheques.map(c => ({
         id: c.id,
+        tipo: c.type,
         vencimento: c.due_date,
         valor: Number(c.amount || 0),
         status: c.status || 'Aguardando',
         banco: c.bank || 'Manual',
         num_doc: c.number || 'S/N',
         emitente: c.issuer_name || 'Titular',
+        juros: Number(c.interest_amount || 0),
+        pagamento: c.payment_date,
   
         isAtrasado: (c.status === 'Atrasado') || (c.status === 'Aguardando' && c.due_date < hoje)
       }));
@@ -108,6 +114,12 @@ const carregarTudo = async () => {
         id: op.id,
         data: op.date, 
         total: totalOp,
+        face: Number(op.total_face_value || 0),
+        juros: Number(op.total_interest || 0),
+        iof: Number(op.iof_amount || 0),
+        comissao: Number(op.comissao_valor || 0),
+        liquido: Number(op.total_net_value || 0),
+        taxa: op.monthly_rate,
         statusGeral: todosPagos ? 'Concluída' : 'Em Aberto',
         temAtraso: temAtraso,
         cheques: chequesFormatados
@@ -126,7 +138,10 @@ const carregarTudo = async () => {
 
 onMounted(() => {
   carregarTudo();
-  api.get('/settings/').then(({ data }) => { taxaMulta.value = Number(data?.fine_rate ?? 2); }).catch(() => {});
+  api.get('/settings/').then(({ data }) => {
+    taxaMulta.value = Number(data?.fine_rate ?? 2);
+    empresa.value = { nome: data?.nomeEmpresa || 'Fozesc', cnpj: data?.cnpj || null };
+  }).catch(() => {});
   document.addEventListener('click', closeStatusMenu);
 });
 
@@ -220,6 +235,24 @@ const getStatusColor = (s, isAtrasado) => {
   }
 };
 
+const gerarRelatorioPdf = async () => {
+  gerandoPdf.value = true;
+  try {
+    await baixarRelatorioClientePdf({
+      empresa: empresa.value.nome,
+      cnpj: empresa.value.cnpj,
+      cliente: { ...cliente.value, enderecoCompleto: enderecoCompleto.value },
+      operacoes: operacoesDoCliente.value,
+      emAberto: totalEmAbertoGlobal.value,
+    });
+  } catch (e) {
+    console.error(e);
+    alert('Não foi possível gerar o PDF.');
+  } finally {
+    gerandoPdf.value = false;
+  }
+};
+
 const exportarFicha = () => {
   isPrinting.value = true;
   setTimeout(() => { window.print(); isPrinting.value = false; }, 300);
@@ -244,9 +277,17 @@ const exportarFicha = () => {
             <p class="text-slate-500 text-sm mt-0.5">Ficha cadastral e operacional</p>
           </div>
         </div>
-        <button @click="exportarFicha" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
-          <Printer class="w-4 h-4 mr-2 text-slate-500" /> Imprimir ficha
-        </button>
+        <div class="flex items-center gap-2">
+          <button @click="exportarFicha" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+            <Printer class="w-4 h-4 mr-2 text-slate-500" /> Imprimir ficha
+          </button>
+          <button @click="gerarRelatorioPdf" :disabled="loading || gerandoPdf" data-campo="relatorio-cliente"
+                  class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+            <Loader2 v-if="gerandoPdf" class="w-4 h-4 mr-2 animate-spin" />
+            <FileDown v-else class="w-4 h-4 mr-2" />
+            {{ gerandoPdf ? 'Gerando...' : 'Relatório PDF' }}
+          </button>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
