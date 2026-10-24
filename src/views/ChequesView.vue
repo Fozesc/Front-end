@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'; 
+import { ref, reactive, computed, onMounted, watch } from 'vue'; 
 import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ChequeForm from '../components/layout/finance/ChequeForm.vue'; 
@@ -15,7 +15,7 @@ import {
   Search, Plus, Trash2, ChevronDown, 
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
-  Edit, Download, CalendarClock, Pencil,
+  Edit, CalendarClock, Pencil,
   HandCoins, FileDown
 } from 'lucide-vue-next';
 
@@ -27,7 +27,6 @@ const showModal = ref(false);
 const showDetailsModal = ref(false);
 const selectedCheque = ref(null);
 const loading = ref(false);
-const isPrinting = ref(false); 
 
 const showProrrogacaoModal = ref(false);
 const chequeParaProrrogar = ref(null);
@@ -264,10 +263,6 @@ const resetFilters = () => {
     currentPage.value = 1; carregarDados();
 };
 
-const exportarTela = () => {
-  isPrinting.value = true;
-  nextTick(() => { window.print(); isPrinting.value = false; });
-};
 </script>
 
 <template>
@@ -292,9 +287,6 @@ const exportarTela = () => {
           <div class="text-slate-500 text-sm mt-1">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> registros</div>
         </div>
         <div class="flex gap-2.5">
-          <button @click="exportarTela" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
-            <Download class="w-4 h-4 mr-2 text-slate-500" /> Exportar
-          </button>
           <button @click="gerarRelatorio" :disabled="gerandoRelatorio" data-campo="relatorio-titulos"
                   title="PDF com todos os títulos do filtro, não só esta página"
                   class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 disabled:opacity-60 transition-colors">
