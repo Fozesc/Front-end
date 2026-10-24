@@ -16,10 +16,11 @@ import {
   ArrowLeft, ArrowRight, Loader2, Calculator,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
   Edit, Download, CalendarClock, Pencil,
-  HandCoins
+  HandCoins, FileDown
 } from 'lucide-vue-next';
 
 import checkService from '../services/checkService';
+import { baixarRelatorioTitulosPdf } from '../utils/relatorioTitulosPdf';
 
 const router = useRouter();
 const showModal = ref(false);
@@ -80,6 +81,31 @@ const filters = reactive({
 const statusOptions = ['Aguardando', 'Pago', 'Atrasado', 'Devolvido', 'Juridico'];
 // o banco grava 'Juridico'; na tela vai com acento
 const rotuloStatus = (s) => (s === 'Juridico' ? 'Jurídico' : s);
+
+// os mesmos filtros da lista: a tela e o relatorio sempre mostram os mesmos titulos
+const paramsDoFiltro = () => ({
+  search: filters.search,
+  status: filters.status.length > 0 ? filters.status.join(',') : '',
+  date_start: filters.date_start,
+  date_end: filters.date_end,
+  calculo: filters.calculo,
+  sort_by: filters.sort_by,
+  sort_order: filters.sort_order
+});
+
+const gerandoRelatorio = ref(false);
+const gerarRelatorio = async () => {
+  gerandoRelatorio.value = true;
+  try {
+    const dados = await checkService.relatorio(paramsDoFiltro());
+    await baixarRelatorioTitulosPdf(dados, { ...filters, status: [...filters.status] });
+  } catch (error) {
+    console.error(error);
+    alert('Não foi possível gerar o relatório.');
+  } finally {
+    gerandoRelatorio.value = false;
+  }
+};
 
 const carregarDados = async () => {
   loading.value = true;
@@ -268,6 +294,13 @@ const exportarTela = () => {
         <div class="flex gap-2.5">
           <button @click="exportarTela" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
             <Download class="w-4 h-4 mr-2 text-slate-500" /> Exportar
+          </button>
+          <button @click="gerarRelatorio" :disabled="gerandoRelatorio" data-campo="relatorio-titulos"
+                  title="PDF com todos os títulos do filtro, não só esta página"
+                  class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 disabled:opacity-60 transition-colors">
+            <Loader2 v-if="gerandoRelatorio" class="w-4 h-4 mr-2 animate-spin text-slate-500" />
+            <FileDown v-else class="w-4 h-4 mr-2 text-slate-500" />
+            {{ gerandoRelatorio ? 'Gerando...' : 'Relatório' }}
           </button>
           <button @click="router.push('/bordero')" class="bg-white border border-slate-300 text-slate-700 h-9 px-3.5 rounded-lg font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
             <Calculator class="w-4 h-4 mr-2 text-slate-500"/> Novo borderô

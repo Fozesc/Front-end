@@ -11,6 +11,7 @@ import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue'
 import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
 import api from '../services/api';
 import { baixarRelatorioClientePdf } from '../utils/relatorioClientePdf';
+import { baixarFichaClientePdf } from '../utils/fichaClientePdf';
 
 // --- SERVIÇOS ---
 import clientService from '../services/clientService';
@@ -19,7 +20,6 @@ import checkService from '../services/checkService';
 
 const route = useRoute();
 const router = useRouter();
-const isPrinting = ref(false);
 const loading = ref(true);
 const aba = ref('operacoes');
 const totalNotas = ref(null);
@@ -235,16 +235,18 @@ const getStatusColor = (s, isAtrasado) => {
   }
 };
 
+const dadosDoPdf = () => ({
+  empresa: empresa.value.nome,
+  cnpj: empresa.value.cnpj,
+  cliente: { ...cliente.value, enderecoCompleto: enderecoCompleto.value },
+  operacoes: operacoesDoCliente.value,
+  emAberto: totalEmAbertoGlobal.value,
+});
+
 const gerarRelatorioPdf = async () => {
   gerandoPdf.value = true;
   try {
-    await baixarRelatorioClientePdf({
-      empresa: empresa.value.nome,
-      cnpj: empresa.value.cnpj,
-      cliente: { ...cliente.value, enderecoCompleto: enderecoCompleto.value },
-      operacoes: operacoesDoCliente.value,
-      emAberto: totalEmAbertoGlobal.value,
-    });
+    await baixarRelatorioClientePdf(dadosDoPdf());
   } catch (e) {
     console.error(e);
     alert('Não foi possível gerar o PDF.');
@@ -253,9 +255,18 @@ const gerarRelatorioPdf = async () => {
   }
 };
 
-const exportarFicha = () => {
-  isPrinting.value = true;
-  setTimeout(() => { window.print(); isPrinting.value = false; }, 300);
+// Ficha em PDF com o cabecalho padrao (antes era a impressao da tela)
+const gerandoFicha = ref(false);
+const exportarFicha = async () => {
+  gerandoFicha.value = true;
+  try {
+    await baixarFichaClientePdf(dadosDoPdf());
+  } catch (e) {
+    console.error(e);
+    alert('Não foi possível gerar a ficha.');
+  } finally {
+    gerandoFicha.value = false;
+  }
 };
 </script>
 
@@ -278,8 +289,11 @@ const exportarFicha = () => {
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button @click="exportarFicha" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
-            <Printer class="w-4 h-4 mr-2 text-slate-500" /> Imprimir ficha
+          <button @click="exportarFicha" :disabled="loading || gerandoFicha" data-campo="ficha-cliente"
+                  class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+            <Loader2 v-if="gerandoFicha" class="w-4 h-4 mr-2 animate-spin text-slate-500" />
+            <Printer v-else class="w-4 h-4 mr-2 text-slate-500" />
+            {{ gerandoFicha ? 'Gerando...' : 'Ficha PDF' }}
           </button>
           <button @click="gerarRelatorioPdf" :disabled="loading || gerandoPdf" data-campo="relatorio-cliente"
                   class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
@@ -461,50 +475,6 @@ const exportarFicha = () => {
       </div>
     </div>
 
-    <Teleport to="body">
-      <div v-if="isPrinting" class="print-overlay">
-        <div class="print-paper">
-          <div class="text-center border-b-2 border-black pb-4 mb-6">
-            <h1 class="text-2xl font-bold uppercase">Extrato de Cliente</h1>
-            <p class="text-lg">{{ cliente.nome }}</p>
-            <p v-if="cliente.endereco" class="text-sm mt-1">{{ enderecoCompleto }}</p>
-          </div>
-          
-          <div class="grid grid-cols-3 gap-4 mb-6 text-sm border-b border-black pb-4">
-            <div><strong>Limite:</strong> {{ formatMoney(cliente.limite) }}</div>
-            <div><strong>Em Aberto:</strong> {{ formatMoney(totalEmAbertoGlobal) }}</div>
-            <div><strong>Disponível:</strong> {{ formatMoney(cliente.limite - totalEmAbertoGlobal) }}</div>
-          </div>
-
-          <div v-for="op in operacoesDoCliente" :key="op.id" class="mb-6 break-inside-avoid">
-            <div class="bg-gray-100 p-2 font-bold text-sm flex justify-between">
-              <span>OP #{{ op.id }} - {{ formatDate(op.data) }}</span>
-              <span>Total: {{ formatMoney(op.total) }}</span>
-            </div>
-            <table class="w-full text-xs text-left border-collapse mt-2">
-              <thead>
-                <tr class="border-b border-gray-300">
-                  <th class="py-1">Vencimento</th>
-                  <th class="py-1">Banco</th>
-                  <th class="py-1">Emitente</th>
-                  <th class="py-1 text-right">Valor</th>
-                  <th class="py-1 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in op.cheques" :key="c.id" class="border-b border-gray-100">
-                  <td class="py-1">{{ formatDate(c.vencimento) }}</td>
-                  <td class="py-1">{{ c.banco }}</td>
-                  <td class="py-1">{{ c.emitente }}</td>
-                  <td class="py-1 text-right">{{ formatMoney(c.valor) }}</td>
-                  <td class="py-1 text-center">{{ c.status }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </DashboardLayout>
 </template>
 
@@ -515,11 +485,5 @@ const exportarFicha = () => {
 @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-@media print {
-  #app { display: none !important; }
-  body { margin: 0 !important; background: white !important; }
-  .print-overlay { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background: white; z-index: 9999; }
-  .print-paper { padding: 10mm; background: white; }
-  .break-inside-avoid { page-break-inside: avoid; }
-}
+
 </style>

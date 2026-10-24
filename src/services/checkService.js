@@ -5,6 +5,10 @@ export default {
 
     return api.get('/checks/', { params }).then(res => res.data);
   },
+  // TODOS os titulos do filtro, sem paginacao (PDF da tela Titulos)
+  relatorio(params) {
+    return api.get('/checks/relatorio', { params }).then(res => res.data);
+  },
   // nomes de emitente ja usados (os mais frequentes primeiro)
   emitentes(q) {
     return api.get('/checks/emitentes', { params: { q, limit: 10 } }).then(res => res.data);
