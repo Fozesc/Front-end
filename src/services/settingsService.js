@@ -12,5 +12,8 @@ export default {
   },
   updateBackup(data) {
     return api.put('/settings/backup', data).then(r => r.data);
+  },
+  enviarBackup() {
+    return api.post('/settings/backup/enviar').then(r => r.data);
   }
 };

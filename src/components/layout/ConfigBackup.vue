@@ -1,8 +1,8 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
-import { Mail, Plus, Trash2, CalendarClock, KeyRound, Save, Loader2, AlertTriangle, CircleCheck, CircleAlert, Info, Database, FileSpreadsheet, FileText, ShieldCheck } from 'lucide-vue-next';
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
+import { Mail, Plus, Trash2, CalendarClock, KeyRound, Save, Loader2, AlertTriangle, CircleCheck, CircleAlert, Info, Database, FileSpreadsheet, FileText, ShieldCheck, Send } from 'lucide-vue-next';
 import settingsService from '../../services/settingsService';
-import { avisar } from '../../utils/avisos';
+import { avisar, confirmar as perguntar } from '../../utils/avisos';
 
 const MAX_EMAILS = 20;
 const FREQUENCIAS = [
@@ -19,23 +19,68 @@ const ARQUIVOS = [
 
 const carregando = ref(true);
 const erroCarga = ref('');
-const cfg = reactive({ destinatarios: [], freq_banco: 'diario', freq_planilha: 'semanal', freq_relatorio: 'mensal', tem_senha: false, configurado: false, ultimo_envio: null });
+const cfg = reactive({ destinatarios: [], freq_banco: 'diario', freq_planilha: 'semanal', freq_relatorio: 'mensal', tem_senha: false, configurado: false, ultimo_envio: null, envio_pedido_em: null });
 const novoEmail = ref('');
 const erroEmail = ref('');
 const senha = reactive({ nova: '', repetir: '' });
 const confirmar = reactive({ visivel: false, senha: '', erro: '', salvando: false });
 
+const salvo = ref('');
+const alterado = computed(() => JSON.stringify([cfg.destinatarios, cfg.freq_banco, cfg.freq_planilha, cfg.freq_relatorio]) !== salvo.value);
+const marcarSalvo = () => { salvo.value = JSON.stringify([cfg.destinatarios, cfg.freq_banco, cfg.freq_planilha, cfg.freq_relatorio]); };
+
 const carregar = async () => {
   erroCarga.value = '';
   try {
     Object.assign(cfg, await settingsService.getBackup());
+    marcarSalvo();
   } catch (e) {
     erroCarga.value = e.response?.data?.error || 'Não foi possível carregar a configuração do backup.';
   } finally {
     carregando.value = false;
   }
 };
-onMounted(carregar);
+let espera = null;
+const acompanhar = () => {
+  clearInterval(espera);
+  if (!cfg.envio_pedido_em) return;
+  const inicio = Date.now();
+  espera = setInterval(async () => {
+    try {
+      const { envio_pedido_em, ultimo_envio } = await settingsService.getBackup();
+      Object.assign(cfg, { envio_pedido_em, ultimo_envio });
+    } catch { /* tenta de novo */ }
+    if (!cfg.envio_pedido_em || Date.now() - inicio > 10 * 60 * 1000) clearInterval(espera);
+  }, 10000);
+};
+onMounted(async () => { await carregar(); acompanhar(); });
+onBeforeUnmount(() => clearInterval(espera));
+
+const enviando = ref(false);
+const enviarAgora = async () => {
+  if (alterado.value || senha.nova) return avisar('Salve as mudanças antes de enviar: o envio usa a configuração salva.');
+  const sim = await perguntar({
+    titulo: 'Enviar o backup agora?',
+    mensagem: 'O servidor faz um backup novo e manda os 3 arquivos para a lista salva.',
+    consequencias: [
+      `Vai para: ${cfg.destinatarios.map(d => d.email).join(', ')}`,
+      'A cópia do banco vai só para quem está marcado em "Recebe o banco".',
+      'Os envios automáticos das 15h continuam iguais.',
+    ],
+    botao: 'Enviar agora',
+  });
+  if (!sim) return;
+  enviando.value = true;
+  try {
+    Object.assign(cfg, await settingsService.enviarBackup());
+    avisar('Pedido feito. O servidor manda em até 1 minuto.', 'ok');
+    acompanhar();
+  } catch (e) {
+    avisar(e.response?.data?.error || 'Não foi possível pedir o envio.');
+  } finally {
+    enviando.value = false;
+  }
+};
 
 const adicionar = () => {
   const email = novoEmail.value.trim().toLowerCase();
@@ -74,7 +119,7 @@ const salvar = async () => {
   confirmar.salvando = true;
   confirmar.erro = '';
   try {
-    const salvo = await settingsService.updateBackup({
+    const resposta = await settingsService.updateBackup({
       senha_login: confirmar.senha,
       destinatarios: cfg.destinatarios,
       freq_banco: cfg.freq_banco,
@@ -82,7 +127,8 @@ const salvar = async () => {
       freq_relatorio: cfg.freq_relatorio,
       senha_arquivos: senha.nova,
     });
-    Object.assign(cfg, salvo);
+    Object.assign(cfg, resposta);
+    marcarSalvo();
     senha.nova = senha.repetir = '';
     confirmar.visivel = false;
     avisar('Configuração do backup salva. Vale a partir do próximo envio, às 15h.', 'ok');
@@ -108,14 +154,33 @@ const salvar = async () => {
       Ainda não foi salvo aqui. Até salvar, o servidor continua mandando para os e-mails e com a senha que estão no .env dele.
     </p>
 
-    <div v-if="ultimo" class="flex items-start gap-3 text-sm rounded-xl p-4 border"
-         :class="ultimo.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'">
-      <CircleCheck v-if="ultimo.ok" class="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
-      <CircleAlert v-else class="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
-      <div>
-        <div class="font-semibold">Último envio: {{ ultimo.quando }} — {{ ultimo.ok ? 'chegou' : 'falhou' }}</div>
-        <div class="text-xs mt-0.5 opacity-80 break-words">{{ ultimo.texto }}</div>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="flex-1 min-w-0 flex items-start gap-3 text-sm">
+        <template v-if="cfg.envio_pedido_em">
+          <Loader2 class="w-4 h-4 mt-0.5 shrink-0 text-indigo-600 animate-spin" />
+          <div>
+            <div class="font-semibold text-slate-900">Envio pedido às {{ cfg.envio_pedido_em.split(' ')[1] }}: aguardando o servidor...</div>
+            <div class="text-xs text-slate-500 mt-0.5">Leva até 1 minuto para começar. Esta tela atualiza sozinha.</div>
+          </div>
+        </template>
+        <template v-else-if="ultimo">
+          <CircleCheck v-if="ultimo.ok" class="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
+          <CircleAlert v-else class="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
+          <div class="min-w-0">
+            <div class="font-semibold" :class="ultimo.ok ? 'text-emerald-800' : 'text-red-800'">Último envio: {{ ultimo.quando }} — {{ ultimo.ok ? 'chegou' : 'falhou' }}</div>
+            <div class="text-xs text-slate-500 mt-0.5 break-words">{{ ultimo.texto }}</div>
+          </div>
+        </template>
+        <template v-else>
+          <Info class="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+          <div class="text-slate-500">Nenhum envio registrado ainda.</div>
+        </template>
       </div>
+      <button @click="enviarAgora" :disabled="enviando || !!cfg.envio_pedido_em || !cfg.configurado || !cfg.destinatarios.length"
+              :title="!cfg.configurado ? 'Salve a configuração antes de enviar' : ''"
+              class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center justify-center gap-2 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+        <Send class="w-4 h-4" /> Enviar backup agora
+      </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
