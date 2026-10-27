@@ -14,5 +14,5 @@ export const AJUDA = {
   '/recorrentes': 'Contas que se repetem (aluguel, luz, internet). Débito automático lança sozinho no caixa no vencimento; a manual espera alguém lançar o valor do mês. Dá para adiar só um vencimento.',
   '/historico': 'O caixa de cada mês: saldo no fim do mês, crescimento e lançamentos. "Extrato" gera o PDF geral do período para os sócios.',
   '/auditoria': 'Quem fez o quê e quando: cada criação, alteração, exclusão e login fica registrada aqui.',
-  '/configuracoes': 'Dados da empresa, taxas padrão (juros, IOF, multa) e a equipe com acesso ao sistema.',
+  '/configuracoes': 'Dados da empresa, taxas padrão (juros, IOF, multa), a equipe com acesso ao sistema e, na aba Backups, quem recebe o backup por e-mail.',
 };

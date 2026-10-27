@@ -2,12 +2,19 @@
 import { ref, reactive, onMounted } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
+import ConfigBackup from '../components/layout/ConfigBackup.vue';
 import { 
   Save, Building, Percent, Users, 
   Plus, Edit2, Trash2, Shield, X, Check, Lock,
-  AlertTriangle, CheckSquare, CheckCircle // <-- Ícones novos para os modais
+  AlertTriangle, CheckSquare, CheckCircle, // <-- Ícones novos para os modais
+  SlidersHorizontal, HardDriveDownload
 } from 'lucide-vue-next';
 import api from '../services/api';
+
+let usuario = {};
+try { usuario = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { usuario = {}; }
+const ehAdmin = usuario.role === 'Admin';
+const aba = ref('geral');
 
 const loading = ref(false);
 const saving = ref(false);
@@ -241,6 +248,22 @@ onMounted(() => {
       </div>
     </div>
 
+    <div v-if="ehAdmin" class="flex bg-slate-100 p-1 rounded-lg gap-0.5 w-fit mb-6" role="tablist">
+      <button @click="aba = 'geral'" role="tab" :aria-selected="aba === 'geral'"
+              class="px-4 py-1.5 text-[13px] font-semibold rounded-md flex items-center gap-2 transition-all"
+              :class="aba === 'geral' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+        <SlidersHorizontal class="w-4 h-4" /> Geral
+      </button>
+      <button @click="aba = 'backups'" role="tab" :aria-selected="aba === 'backups'"
+              class="px-4 py-1.5 text-[13px] font-semibold rounded-md flex items-center gap-2 transition-all"
+              :class="aba === 'backups' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+        <HardDriveDownload class="w-4 h-4" /> Backups
+      </button>
+    </div>
+
+    <ConfigBackup v-if="aba === 'backups'" />
+
+    <div v-show="aba === 'geral'">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200/80 h-fit">
@@ -352,6 +375,7 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
+    </div>
     </div>
 
   </DashboardLayout>
