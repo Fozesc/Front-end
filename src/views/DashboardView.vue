@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import RelatorioModal from '../components/layout/RelatorioModal.vue';
 import { 
@@ -247,7 +248,7 @@ const chartOptionsLine = {
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Visão Geral</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/']">Visão Geral</h1>
         <p class="text-slate-500 text-sm mt-1">Resumo financeiro em tempo real.</p>
       </div>
 

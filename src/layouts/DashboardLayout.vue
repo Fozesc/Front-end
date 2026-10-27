@@ -1,8 +1,10 @@
 <script setup>
 import api from '../services/api';
+import { confirmar } from '../utils/avisos';
 import { ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { VERSAO } from '../versao';
+import { AJUDA } from '../utils/ajuda';
 import { 
   LayoutDashboard, 
   Banknote, 
@@ -20,7 +22,9 @@ import {
   CalendarClock,
   HandCoins,
   FileBarChart,
-  CalendarDays
+  CalendarDays,
+  SquareFunction,
+  Repeat
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -33,12 +37,14 @@ const secoes = [
     { name: 'Títulos', path: '/cheques', icon: Banknote },
     { name: 'Borderô', path: '/bordero', icon: Calculator },
     { name: 'Clientes', path: '/clientes', icon: Users },
-    { name: 'Calendário', path: '/calendario', icon: CalendarDays }
+    { name: 'Calendário', path: '/calendario', icon: CalendarDays },
+    { name: 'Cálculos', path: '/calculos', icon: SquareFunction }
   ] },
   { titulo: 'Financeiro', itens: [
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: DollarSign },
     { name: 'Relatório do Caixa', path: '/relatorio-caixa', icon: FileBarChart },
     { name: 'Vales', path: '/vales', icon: HandCoins },
+    { name: 'Despesas recorrentes', path: '/recorrentes', icon: Repeat },
     { name: 'Histórico Mensal', path: '/historico', icon: CalendarClock }
   ] },
   { titulo: 'Controle', itens: [
@@ -63,7 +69,7 @@ const toggleDesktopSidebar = () => {
 };
 
 const handleLogout = async () => {
-  if(confirm("Deseja realmente sair do sistema?")) {
+  if (await confirmar({ titulo: 'Sair do sistema?', mensagem: 'Para voltar, é preciso entrar de novo com o e-mail e a senha.', botao: 'Sair' })) {
     try {
      
       await api.post('/auth/logout'); 
@@ -111,7 +117,7 @@ const handleLogout = async () => {
               :class="ativo(item.path)
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
-              :title="isSidebarCollapsed ? item.name : ''"
+              :title="AJUDA[item.path]"
             >
               <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0 transition-colors"
                          :class="[isSidebarCollapsed ? 'mx-auto' : 'mr-3', ativo(item.path) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600']" />

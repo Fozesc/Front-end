@@ -1,5 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'; 
+import { AJUDA } from '../utils/ajuda';
+import { avisarErro } from '../utils/avisos';
 import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ChequeForm from '../components/layout/finance/ChequeForm.vue'; 
@@ -100,7 +102,7 @@ const gerarRelatorio = async () => {
     await baixarRelatorioTitulosPdf(dados, { ...filters, status: [...filters.status] });
   } catch (error) {
     console.error(error);
-    alert('Não foi possível gerar o relatório.');
+    avisarErro(error, 'Não foi possível gerar o relatório. Tente de novo.');
   } finally {
     gerandoRelatorio.value = false;
   }
@@ -204,7 +206,7 @@ const salvarCheque = async (dadosFormulario) => {
     showModal.value = false;
     carregarDados();
   } catch (error) {
-    alert(error.response?.data?.error || "Erro ao salvar o cheque.");
+    avisarErro(error, 'Não foi possível salvar o título. Nada foi gravado.');
   } finally {
     loading.value = false;
   }
@@ -283,7 +285,7 @@ const resetFilters = () => {
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Títulos</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/cheques']">Títulos</h1>
           <div class="text-slate-500 text-sm mt-1">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> registros</div>
         </div>
         <div class="flex gap-2.5">

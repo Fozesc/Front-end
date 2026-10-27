@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, onMounted } from 'vue';
+import { avisarErro } from '../../utils/avisos';
 import { X, Save } from 'lucide-vue-next';
 import transactionService from '../../services/transactionService'; 
 
@@ -33,7 +34,7 @@ const salvar = async () => {
     emit('close');
   } catch (error) {
     console.error(error);
-    alert("Erro ao salvar capital social.");
+    avisarErro(error, 'Não foi possível salvar o capital social. Nada foi alterado.');
   }
 };
 </script>

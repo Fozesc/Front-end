@@ -1,12 +1,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Landmark, Wallet, ArrowUpCircle, ArrowDownCircle,
   TrendingUp, TrendingDown, Loader2, ChevronLeft, ChevronRight,
-  Layers, Coins, ChevronDown
+  Layers, Coins, ChevronDown, FileDown, X
 } from 'lucide-vue-next';
 import historyService from '../services/historyService';
+import api from '../services/api';
+import { baixarExtratoPeriodoPdf } from '../utils/extratoPeriodoPdf';
 
 const meses = ref([]);
 const selectedIndex = ref(0);
@@ -55,6 +58,43 @@ const carregarMeses = async () => {
 
 onMounted(carregarMeses);
 
+// extrato do periodo em PDF: por padrao o mes de hoje; atalhos para o dia e o mes da tela
+const iso = (d) => d.toLocaleDateString('en-CA');
+const atalhosExtrato = computed(() => {
+  const hoje = new Date();
+  const lista = [
+    { rotulo: 'Hoje', inicio: iso(hoje), fim: iso(hoje) },
+    { rotulo: 'Este mês', inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), fim: iso(hoje) },
+  ];
+  const m = mesAtual.value;
+  if (m && !(m.year === hoje.getFullYear() && m.month === hoje.getMonth() + 1)) {
+    lista.push({ rotulo: m.label, inicio: iso(new Date(m.year, m.month - 1, 1)), fim: iso(new Date(m.year, m.month, 0)) });
+  }
+  return lista;
+});
+const extrato = ref(null);
+const gerandoExtrato = ref(false);
+const erroExtrato = ref('');
+const abrirExtrato = () => {
+  const { inicio, fim } = atalhosExtrato.value[1];
+  extrato.value = { inicio, fim };
+  erroExtrato.value = '';
+};
+const gerarExtrato = async () => {
+  gerandoExtrato.value = true;
+  erroExtrato.value = '';
+  try {
+    const { data } = await api.get('/reports/extrato', { params: extrato.value });
+    await baixarExtratoPeriodoPdf(data);
+    extrato.value = null;
+  } catch (e) {
+    console.error(e);
+    erroExtrato.value = e.response?.data?.error || 'Não foi possível gerar o extrato.';
+  } finally {
+    gerandoExtrato.value = false;
+  }
+};
+
 const irPara = (i) => {
   if (i >= 0 && i < meses.value.length) {
     selectedIndex.value = i;
@@ -69,10 +109,15 @@ const irPara = (i) => {
     <!-- CABEÇALHO + SELETOR DE MÊS -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Histórico Mensal</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/historico']">Histórico Mensal</h1>
         <p class="text-slate-500 text-sm mt-1">Consulte o caixa de cada mês: saldos, crescimento e lançamentos.</p>
       </div>
 
+      <div class="flex items-center gap-2.5">
+      <button @click="abrirExtrato" data-campo="extrato"
+              class="bg-white border border-slate-300 text-slate-700 h-10 px-3.5 rounded-xl font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
+        <FileDown class="w-4 h-4 mr-2 text-slate-500" /> Extrato
+      </button>
       <!-- navegação de mês -->
       <div v-if="meses.length" class="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
         <button @click="irPara(selectedIndex + 1)" :disabled="selectedIndex >= meses.length - 1"
@@ -93,6 +138,38 @@ const irPara = (i) => {
                 title="Próximo mês"
                 class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 disabled:opacity-30 disabled:cursor-not-allowed">
           <ChevronRight class="w-[18px] h-[18px]" />
+        </button>
+      </div>
+      </div>
+    </div>
+
+    <!-- EXTRATO DO PERÍODO (PDF) -->
+    <div v-if="extrato" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" @click.self="extrato = null">
+      <div class="w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-200 p-5 space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">Extrato do período</h2>
+            <p class="text-sm text-slate-500 mt-0.5">PDF com o caixa, borderôs, recebimentos, prorrogações, vales e o que venceu.</p>
+          </div>
+          <button @click="extrato = null" aria-label="Fechar" class="p-1 rounded-lg text-slate-400 hover:bg-slate-100"><X class="w-4 h-4" /></button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button v-for="a in atalhosExtrato" :key="a.rotulo" @click="extrato.inicio = a.inicio; extrato.fim = a.fim"
+                  class="px-3 h-8 rounded-lg text-[13px] font-medium border capitalize transition-colors"
+                  :class="extrato.inicio === a.inicio && extrato.fim === a.fim ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'">
+            {{ a.rotulo }}
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="date" v-model="extrato.inicio" aria-label="De" class="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15" />
+          <span class="text-slate-400 text-sm">a</span>
+          <input type="date" v-model="extrato.fim" aria-label="Até" class="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15" />
+        </div>
+        <p v-if="erroExtrato" class="text-sm text-red-600">{{ erroExtrato }}</p>
+        <button @click="gerarExtrato" :disabled="gerandoExtrato || !extrato.inicio || !extrato.fim" data-campo="gerar-extrato"
+                class="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+          <Loader2 v-if="gerandoExtrato" class="w-4 h-4 animate-spin" /><FileDown v-else class="w-4 h-4" />
+          {{ gerandoExtrato ? 'Gerando PDF...' : 'Gerar PDF' }}
         </button>
       </div>
     </div>

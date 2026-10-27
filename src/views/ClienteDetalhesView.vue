@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { AJUDA } from '../utils/ajuda';
+import { avisar, avisarErro } from '../utils/avisos';
 import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
@@ -168,7 +170,7 @@ const alterarStatus = async (cheque, novoStatus) => {
     if (novoStatus === 'Pago') chequeParaReceber.value = completo;
     else mudancaStatus.value = { cheque: completo, status: novoStatus };
   } catch (error) {
-    alert("Não foi possível abrir o título.");
+    avisarErro(error, 'Não foi possível abrir o título. Tente de novo.');
   }
 };
 
@@ -249,7 +251,7 @@ const gerarRelatorioPdf = async () => {
     await baixarRelatorioClientePdf(dadosDoPdf());
   } catch (e) {
     console.error(e);
-    alert('Não foi possível gerar o PDF.');
+    avisar('Não foi possível gerar o PDF do relatório. Tente de novo.');
   } finally {
     gerandoPdf.value = false;
   }
@@ -263,7 +265,7 @@ const exportarFicha = async () => {
     await baixarFichaClientePdf(dadosDoPdf());
   } catch (e) {
     console.error(e);
-    alert('Não foi possível gerar a ficha.');
+    avisar('Não foi possível gerar a ficha em PDF. Tente de novo.');
   } finally {
     gerandoFicha.value = false;
   }
@@ -284,7 +286,7 @@ const exportarFicha = async () => {
             <ArrowLeft class="w-[18px] h-[18px]" />
           </button>
           <div>
-            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">{{ cliente.nome }}</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/clientes/detalhe']">{{ cliente.nome }}</h1>
             <p class="text-slate-500 text-sm mt-0.5">Ficha cadastral e operacional</p>
           </div>
         </div>

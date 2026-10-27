@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, reactive, watch, computed } from 'vue';
+import { AJUDA } from '../utils/ajuda';
+import { avisarErro } from '../utils/avisos';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import NovoLancamentoModal from '../components/FluxoCaixa/NovoLancamentoModal.vue';
 import ConfiguracaoModal from '../components/FluxoCaixa/ConfiguracaoModal.vue';
@@ -96,7 +98,7 @@ const salvarLancamento = async (dados) => {
     showModal.value = false;
     await carregarTabela();
     await carregarSaldos(); 
-  } catch (error) { alert(error.response?.data?.error || "Erro ao salvar."); }
+  } catch (error) { avisarErro(error, 'Não foi possível salvar o lançamento. Nada foi gravado.'); }
 };
 
 const excluirLancamento = (item) => {
@@ -265,7 +267,7 @@ const linhas = computed(() => {
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Fluxo de Caixa</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/fluxo-caixa']">Fluxo de Caixa</h1>
         <p class="text-slate-500 text-sm mt-1">Saldos por conta, dinheiro na rua e lançamentos.</p>
       </div>
       <div class="flex gap-2.5">

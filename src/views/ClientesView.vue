@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, reactive, watch, nextTick } from 'vue';
+import { AJUDA } from '../utils/ajuda';
+import { avisar, avisarErro } from '../utils/avisos';
 import { useRouter } from 'vue-router'; 
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
@@ -95,7 +97,7 @@ onMounted(fetchClientes);
 const abrirDetalhes = (id) => { router.push({ name: 'cliente-detalhes', params: { id } }); };
 
 const salvarCliente = async () => {
-  if (!form.value.name) return alert("O nome é obrigatório.");
+  if (!form.value.name) return avisar('Preencha o nome do cliente.');
   saving.value = true;
   try {
     const payload = { ...form.value };
@@ -103,7 +105,7 @@ const salvarCliente = async () => {
     else await clientService.create(payload);
     showModal.value = false;
     fetchClientes(); 
-  } catch (error) { alert('Erro ao salvar.'); } finally { saving.value = false; }
+  } catch (error) { avisarErro(error, 'Não foi possível salvar o cliente. Nada foi gravado.'); } finally { saving.value = false; }
 };
 
 const abrirModal = (clienteId = null) => {
@@ -167,7 +169,7 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
     <div class="print:hidden">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Clientes</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/clientes']">Clientes</h1>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-slate-500 text-sm">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> clientes</span>
             <span v-if="loading" class="text-xs text-indigo-600 font-medium ml-2 flex items-center">

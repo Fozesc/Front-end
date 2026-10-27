@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, onMounted, computed } from 'vue';
+import { avisar } from '../../utils/avisos';
 import { X, Save, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Wallet, Building, Banknote } from 'lucide-vue-next';
 import BaseDateInput from '../common/BaseDateInput.vue';
 
@@ -53,8 +54,8 @@ onMounted(() => {
 
 const salvar = () => {
   if (form.tipo === 'troca') {
-    if (!form.valor || parseFloat(form.valor) <= 0) return alert("Preencha o valor");
-    if (form.conta_entrada === form.conta_saida) return alert("Escolha contas diferentes para a troca");
+    if (!form.valor || parseFloat(form.valor) <= 0) return avisar('Preencha o valor da troca.');
+    if (form.conta_entrada === form.conta_saida) return avisar('A troca precisa de duas contas diferentes.');
     return emit('save', {
       troca: true,
       descricao: form.descricao,
@@ -64,7 +65,7 @@ const salvar = () => {
       conta_saida: form.conta_saida
     });
   }
-  if (!form.descricao || !form.valor) return alert("Preencha descrição e valor");
+  if (!form.descricao || !form.valor) return avisar('Preencha a descrição e o valor do lançamento.');
   
 
   let valorFinal = Math.abs(parseFloat(form.valor));

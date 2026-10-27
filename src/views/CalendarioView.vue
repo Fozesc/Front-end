@@ -1,5 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { AJUDA } from '../utils/ajuda';
+import { confirmar } from '../utils/avisos';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
 import EventoModal from '../components/layout/EventoModal.vue';
@@ -83,7 +85,8 @@ const doDia = computed(() => porDia.value[diaSel.value] || { cheques: [], evento
 const novo = (data) => Object.assign(modal, { aberto: true, evento: null, data: data || diaSel.value });
 const editar = (e) => Object.assign(modal, { aberto: true, evento: e, data: '' });
 const apagar = async (e) => {
-  if (!confirm(`Apagar "${e.titulo}"?`)) return;
+  if (!await confirmar({ titulo: 'Apagar do calendário?', mensagem: `"${e.titulo}" sai do calendário.`,
+    consequencias: e.valor ? ['O valor dele sai também da previsão do caixa.'] : [], botao: 'Apagar', perigo: true })) return;
   try { await calendarioService.apagar(e.id); await carregar(); } catch (err) { erro.value = err.response?.data?.error || 'Não foi possível apagar.'; }
 };
 const concluir = async (e) => {
@@ -102,7 +105,7 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
     <div class="space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Calendário</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/calendario']">Calendário</h1>
           <p class="text-slate-500 text-sm mt-0.5">Cheques por vencimento, eventos, notas e lembretes, com a previsão do caixa.</p>
         </div>
         <button @click="novo()" data-campo="novo-evento" class="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-semibold shadow-xs flex items-center gap-2">

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, reactive, watch, computed } from 'vue';
+import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Search, Activity, User, Eye, X,
@@ -221,7 +222,7 @@ const formatHora = (iso) => {
 
     <div class="flex items-center gap-3 mb-7">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Auditoria</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/auditoria']">Auditoria</h1>
         <div class="flex items-center gap-2 mt-1">
           <p class="text-slate-500 text-sm">Tudo que foi feito no sistema, por quem e quando.</p>
           <span v-if="loading" class="text-xs text-indigo-600 font-medium ml-2 flex items-center"><Loader2 class="w-3 h-3 mr-1 animate-spin" /> Buscando...</span>

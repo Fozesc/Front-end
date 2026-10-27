@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
+import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Save, Building, Percent, Users, 
@@ -235,7 +236,7 @@ onMounted(() => {
 
     <div class="flex items-center gap-3 mb-7">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Configurações</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/configuracoes']">Configurações</h1>
         <p class="text-slate-500 text-sm mt-1">Parâmetros do sistema e gestão de equipe.</p>
       </div>
     </div>

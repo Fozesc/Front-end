@@ -1,5 +1,6 @@
 <script setup>
 import { reactive } from 'vue';
+import { avisar } from '../../../utils/avisos';
 import { DollarSign, Save, X, Banknote, Building, Wallet, AlertTriangle, FileText } from 'lucide-vue-next';
 import BaseDateInput from '../../common/BaseDateInput.vue'; 
 
@@ -36,11 +37,11 @@ const onClienteSelecionado = (cliente) => {
 
 const handleSave = () => {
   if (!form.client_id) { 
-    alert('Por favor, selecione um cliente.'); 
+    avisar('Escolha o cliente do título antes de salvar.'); 
     return; 
   }
   if (!form.valor_liquido || !form.vencimento) { 
-    alert('Valor e Vencimento são obrigatórios.'); 
+    avisar('Preencha o valor e o vencimento do título.'); 
     return; 
   }
   

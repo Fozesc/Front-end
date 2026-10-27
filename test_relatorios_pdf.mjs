@@ -5,6 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { gerarRelatorioTitulosPdf, descreverFiltros } from './src/utils/relatorioTitulosPdf.js';
 import { gerarFichaClientePdf } from './src/utils/fichaClientePdf.js';
 import { gerarRelatorioClientePdf } from './src/utils/relatorioClientePdf.js';
+import { gerarExtratoPeriodoPdf } from './src/utils/extratoPeriodoPdf.js';
 
 const legivel = (doc) => doc.output().replace(/\\([()])/g, '$1');
 const SIT = ['Aguardando', 'Atrasado', 'Pago', 'Devolvido', 'Juridico'];
@@ -64,9 +65,38 @@ for (const t of ['Relatório do Cliente', 'Gestão de recebíveis', 'Títulos po
   assert.ok(relatorio.includes(t), `relatório: faltou ${t}`);
 }
 
+const conta = (c) => ({ conta: c, saldo_anterior: 100, entradas: 50, saidas: 20, saldo_final: 130 });
+const semNada = {
+  empresa: 'Fozesc', cnpj: null, gerado_em: '27/10/2026 10:00', inicio: '2026-10-27', fim: '2026-10-27',
+  caixa: { resumo: { saldo_anterior: 300, entradas: 0, saidas: 0, qtd: 0, saldo_final: 300 }, por_conta: ['Dinheiro', 'BB', 'Caixa'].map(conta),
+           categorias: { entrada: [], saida: [] }, linhas: [], total: 0, cortado: false },
+  borderos: [], recebimentos: [], quitados: { qtd: 0, valor: 0 }, prorrogacoes: [], vencidos: [],
+  vales: { saidos: [], pagos: [], em_aberto: 0 }, carteira: {},
+};
+const extratoVazio = legivel(await gerarExtratoPeriodoPdf(semNada));
+for (const t of ['Extrato do Período', 'Contas', 'Nenhum borderô no período', 'Nenhum recebimento no período', 'Carteira hoje', 'Nenhum lançamento no período']) {
+  assert.ok(extratoVazio.includes(t), `extrato vazio: faltou ${t}`);
+}
+const cheio = {
+  ...semNada, inicio: '2026-10-01',
+  caixa: { ...semNada.caixa, linhas: Array.from({ length: 80 }, (_, i) => ({ data: '2026-10-02', descricao: `Linha ${i}`, categoria: 'Geral', conta: 'BB', entrada: 10, saida: null, saldo: 10 * i })), total: 90, cortado: true },
+  borderos: [{ id: 7, data: '2026-10-02', cliente: 'Maria', titulos: 2, face: 1000, juros: 40, iof: 4, comissao: 10, liquido: 956 }],
+  recebimentos: [{ data: '2026-10-05', cliente: 'Maria', emitente: 'Joao', numero: '9', categoria: 'Recebimento de Cheque', conta: 'Dinheiro', valor: 600 }],
+  prorrogacoes: [{ data: '2026-10-08', cliente: 'Maria', emitente: 'Ana', numero: '10', de: '2026-10-08', para: '2026-10-20', dias: 12, juros: 80 }],
+  vencidos: [{ vencimento: '2026-10-20', cliente: 'Maria', emitente: 'Ana', numero: '10', valor: 400, situacao: 'Juridico' }],
+  vales: { saidos: [{ data: '2026-10-06', descricao: 'Vale do Joao', conta: 'BB', valor: 50, status: 'Aberto' }], pagos: [], em_aberto: 50 },
+  carteira: { Atrasado: { qtd: 1, valor: 400 } },
+};
+const extratoPdf = await gerarExtratoPeriodoPdf(cheio);
+const extrato = legivel(extratoPdf);
+for (const t of ['01/10/2026 a 27/10/2026', 'Borderôs feitos (1)', '#7', 'Joao · nº 9', 'Prorrogações (1)', 'Vale do Joao', 'Jurídico', 'parou em 80 de 90']) {
+  assert.ok(extrato.includes(t), `extrato: faltou ${t}`);
+}
+assert.ok(extratoPdf.internal.getNumberOfPages() >= 3, 'extrato longo vai para várias páginas');
+
 if (process.argv[2]) {
   writeFileSync(`${process.argv[2]}/titulos.pdf`, Buffer.from(titulos.output('arraybuffer')));
   writeFileSync(`${process.argv[2]}/ficha.pdf`, Buffer.from((await gerarFichaClientePdf({ empresa: 'Fozesc', cnpj: '12.345.678/0001-90', cliente, operacoes, emAberto: 6000 })).output('arraybuffer')));
   writeFileSync(`${process.argv[2]}/relatorio-cliente.pdf`, Buffer.from((await gerarRelatorioClientePdf({ empresa: 'Fozesc', cnpj: '12.345.678/0001-90', cliente, operacoes, emAberto: 6000 })).output('arraybuffer')));
 }
-console.log('OK: PDFs de Títulos (filtros, resumo, por cliente, lista em várias páginas), Ficha do Cliente (sem observação) e Relatório do Cliente com o cabeçalho padrão.');
+console.log('OK: PDFs de Títulos (filtros, resumo, por cliente, lista em várias páginas), Ficha do Cliente (sem observação) e Relatório do Cliente com o cabeçalho padrão, e o Extrato do Período (cheio e vazio).');

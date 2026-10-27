@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
+import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Plus, Trash2, Save, ArrowLeft, Printer, Calculator,
@@ -448,7 +449,7 @@ const processarSalvamento = async () => {
         <div class="flex items-center gap-3">
           <button @click="router.back()" aria-label="Voltar" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-300 shadow-xs hover:bg-slate-50 rounded-md text-slate-500"><ArrowLeft class="w-[18px] h-[18px]" /></button>
           <div>
-            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">Cálculo de Borderô</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/bordero']">Cálculo de Borderô</h1>
             <p class="text-slate-500 text-sm mt-0.5">Novo borderô de cheques ou antecipação.</p>
           </div>
         </div>

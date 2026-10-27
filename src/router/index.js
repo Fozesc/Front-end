@@ -14,6 +14,9 @@ import HistoricoView from '../views/HistoricoView.vue'
 import ValesView from '../views/ValesView.vue'
 import RelatorioCaixaView from '../views/RelatorioCaixaView.vue'
 import CalendarioView from '../views/CalendarioView.vue'
+import FolhasView from '../views/FolhasView.vue'
+import RecorrentesView from '../views/RecorrentesView.vue'
+import { gerarPendentes } from '../services/recorrenteService'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -94,6 +97,18 @@ const router = createRouter({
       name: 'calendario',
       component: CalendarioView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/calculos',
+      name: 'calculos',
+      component: FolhasView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/recorrentes',
+      name: 'recorrentes',
+      component: RecorrentesView,
+      meta: { requiresAuth: true }
     }
   ]
 })
@@ -101,7 +116,7 @@ const router = createRouter({
 /**
  * GUARDA GLOBAL DE AUTENTICAÇÃO
  */
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // 1. Buscamos a chave correta: 'user'
   const userSession = localStorage.getItem('user');
 
@@ -113,6 +128,10 @@ router.beforeEach((to, from, next) => {
   if (to.name === 'login' && userSession) {
     return next({ name: 'dashboard' })
   }
+
+  // debito automatico das despesas recorrentes ANTES da tela carregar, para o caixa que ela
+  // mostra ja vir com o que venceu (no maximo um pedido a cada 10 min; falha nao trava a tela)
+  if (to.meta.requiresAuth) await gerarPendentes();
 
 
   next()
