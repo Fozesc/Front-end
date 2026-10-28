@@ -102,10 +102,12 @@ const carregarOperacoes = async (pagina = 1) => {
   carregandoOps.value = true;
   try {
     const res = await operationService.getByClient(Number(route.params.id), pagina);
-    operacoesDoCliente.value = (res.items || []).map(op => formatarOperacao(op, hojeIso()));
-    paginaOps.value = res.page || 1;
-    totalPaginasOps.value = res.pages || 1;
-    totalOps.value = res.total || 0;
+    // servidor antes da 2.10 devolve a lista inteira (sem paginas): a ficha continua funcionando
+    const lista = Array.isArray(res) ? res : (res.items || []);
+    operacoesDoCliente.value = lista.map(op => formatarOperacao(op, hojeIso()));
+    paginaOps.value = Array.isArray(res) ? 1 : (res.page || 1);
+    totalPaginasOps.value = Array.isArray(res) ? 1 : (res.pages || 1);
+    totalOps.value = Array.isArray(res) ? res.length : (res.total || 0);
     const primeira = operacoesDoCliente.value[0]?.id;
     if (primeira && !expandedOps.value.includes(primeira)) expandedOps.value.push(primeira);
   } catch (error) {
@@ -136,8 +138,12 @@ const carregarTudo = async () => {
         cep: dadosCliente.zip_code || ''
       };
       reputacao.value = dadosCliente.reputacao || null;
-      totalEmAbertoGlobal.value = Number(dadosCliente.valor_em_aberto || 0);
-      totalDevolvido.value = Number(dadosCliente.valor_devolvido || 0);
+      // servidor antes da 2.10 nao manda os totais: soma dos borderos (la vem todos de uma vez)
+      const cheques = operacoesDoCliente.value.flatMap(op => op.cheques);
+      totalEmAbertoGlobal.value = dadosCliente.valor_em_aberto !== undefined ? Number(dadosCliente.valor_em_aberto || 0)
+        : cheques.filter(c => !['Pago', 'Compensado'].includes(c.status)).reduce((t, c) => t + c.valor, 0);
+      totalDevolvido.value = dadosCliente.valor_devolvido !== undefined ? Number(dadosCliente.valor_devolvido || 0)
+        : cheques.filter(c => c.status === 'Devolvido').reduce((t, c) => t + c.valor, 0);
     }
   } catch (error) {
     console.error("Erro ao carregar ficha:", error);
@@ -226,8 +232,8 @@ const todasOperacoes = async () => {
   const lista = [];
   for (let pagina = 1, paginas = 1; pagina <= paginas; pagina++) {
     const res = await operationService.getByClient(Number(route.params.id), pagina, 50);
-    paginas = res.pages || 1;
-    lista.push(...(res.items || []).map(op => formatarOperacao(op, hojeIso())));
+    paginas = Array.isArray(res) ? 1 : (res.pages || 1);
+    lista.push(...(Array.isArray(res) ? res : (res.items || [])).map(op => formatarOperacao(op, hojeIso())));
   }
   return lista;
 };
