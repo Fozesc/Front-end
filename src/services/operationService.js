@@ -9,9 +9,10 @@ export default {
     },
 
    
-    getByClient(clientId) {
+    // borderôs do cliente em paginas: { items, total, pages, page }
+    getByClient(clientId, page = 1, per_page = 10) {
         
-        return api.get(`/operations/client/${clientId}`).then(res => res.data);
+        return api.get(`/operations/client/${clientId}`, { params: { page, per_page } }).then(res => res.data);
     },
 
     create(data) {

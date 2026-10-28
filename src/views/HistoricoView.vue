@@ -5,9 +5,10 @@ import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Landmark, Wallet, ArrowUpCircle, ArrowDownCircle,
   TrendingUp, TrendingDown, Loader2, ChevronLeft, ChevronRight,
-  Layers, Coins, ChevronDown, FileDown, X
+  Layers, Coins, ChevronDown, FileDown, X, BarChart3, ArrowLeft, ArrowRight
 } from 'lucide-vue-next';
 import historyService from '../services/historyService';
+import LucroMensalModal from '../components/layout/LucroMensalModal.vue';
 import api from '../services/api';
 import { baixarExtratoPeriodoPdf } from '../utils/extratoPeriodoPdf';
 
@@ -16,12 +17,28 @@ const selectedIndex = ref(0);
 const detalhe = ref(null);
 const loadingMeses = ref(true);
 const loadingDetalhe = ref(false);
+const paginaLanc = ref(1);
+const verGraficoLucro = ref(false);
 
 const formatMoney = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 
 const mesAtual = computed(() => meses.value[selectedIndex.value] || null);
 const resumo = computed(() => detalhe.value?.resumo || {});
+const lucro = computed(() => detalhe.value?.lucro_bruto || null);
+// linhas do lucro bruto, na ordem da conta; so mostra o que teve valor (a primeira sempre)
+const linhasLucro = computed(() => {
+  const l = lucro.value;
+  if (!l) return [];
+  return [
+    { nome: `Juros dos borderôs do mês (${l.qtd_borderos} borderô${l.qtd_borderos === 1 ? '' : 's'})`, valor: l.juros_borderos, sinal: '', sempre: true },
+    { nome: 'Juros de prorrogação recebidos', valor: l.prorrogacao, sinal: '+' },
+    { nome: 'Imposto cobrado no recebimento', valor: l.imposto, sinal: '+' },
+    { nome: 'Multas de devolução', valor: l.multa, sinal: '+' },
+    { nome: 'Outros juros e multas lançados no caixa', valor: l.outros, sinal: '+' },
+    { nome: 'Comissões pagas', valor: l.comissoes, sinal: '−' },
+  ].filter(x => x.sempre || x.valor);
+});
 const totalCaixa = computed(() => detalhe.value ? detalhe.value.bancos.reduce((s, b) => s + b.saldo, 0) : 0);
 
 const bankStyle = (key) => ({
@@ -30,12 +47,13 @@ const bankStyle = (key) => ({
   DINHEIRO: { icon: Wallet,   color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'border-emerald-100' },
 }[key] || { icon: Wallet, color: 'text-slate-600', bg: 'bg-slate-50', ring: 'border-slate-100' });
 
-const carregarDetalhe = async () => {
+const carregarDetalhe = async (pagina = 1) => {
   const mes = mesAtual.value;
   if (!mes) return;
   loadingDetalhe.value = true;
   try {
-    detalhe.value = await historyService.getMonthDetail(mes.year, mes.month);
+    detalhe.value = await historyService.getMonthDetail(mes.year, mes.month, pagina);
+    paginaLanc.value = detalhe.value.lancamentos_pagina || 1;
   } catch (e) {
     console.error('Erro ao carregar mês:', e);
   } finally {
@@ -105,15 +123,20 @@ const irPara = (i) => {
 
 <template>
   <DashboardLayout>
+    <LucroMensalModal v-if="verGraficoLucro" @close="verGraficoLucro = false" />
 
     <!-- CABEÇALHO + SELETOR DE MÊS -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/historico']">Histórico Mensal</h1>
-        <p class="text-slate-500 text-sm mt-1">Consulte o caixa de cada mês: saldos, crescimento e lançamentos.</p>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/historico']">Histórico Mensal</h1>
+        <p class="text-slate-500 text-sm mt-1">Consulte o caixa de cada mês: saldos, lucro bruto e lançamentos.</p>
       </div>
 
       <div class="flex items-center gap-2.5">
+      <button @click="verGraficoLucro = true" data-campo="abrir-grafico-lucro" v-dica="AJUDA.graficoLucro"
+              class="bg-white border border-slate-300 text-slate-700 h-10 px-3.5 rounded-xl font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
+        <BarChart3 class="w-4 h-4 mr-2 text-emerald-600" /> Lucro de todos os meses
+      </button>
       <button @click="abrirExtrato" data-campo="extrato"
               class="bg-white border border-slate-300 text-slate-700 h-10 px-3.5 rounded-xl font-semibold text-sm flex items-center shadow-xs hover:bg-slate-50 transition-colors">
         <FileDown class="w-4 h-4 mr-2 text-slate-500" /> Extrato
@@ -247,14 +270,38 @@ const irPara = (i) => {
           <div class="text-xs text-slate-500 mt-0.5">entradas − saídas</div>
         </div>
         <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
-          <div class="flex items-center gap-1.5 text-emerald-600 mb-2"><TrendingUp class="w-4 h-4" /><span class="text-xs font-medium">Lucro</span></div>
-          <div class="text-lg font-semibold tracking-tight tabular-nums text-slate-900">{{ formatMoney(resumo.lucro) }}</div>
-          <div class="text-xs text-slate-500 mt-0.5">juros · {{ resumo.qtd_operacoes }} op.</div>
+          <div class="flex items-center gap-1.5 text-emerald-600 mb-2"><TrendingUp class="w-4 h-4" /><span class="text-xs font-medium">Lucro bruto</span></div>
+          <div class="text-lg font-semibold tracking-tight tabular-nums" :class="(lucro?.lucro_bruto || 0) < 0 ? 'text-red-600' : 'text-slate-900'">{{ formatMoney(lucro?.lucro_bruto) }}</div>
+          <div class="text-xs text-slate-500 mt-0.5">conta completa logo abaixo</div>
         </div>
         <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
           <div class="flex items-center gap-1.5 text-slate-600 mb-2"><Wallet class="w-4 h-4" /><span class="text-xs font-medium">Saldo total</span></div>
           <div class="text-lg font-semibold tracking-tight tabular-nums" :class="totalCaixa >= 0 ? 'text-slate-900' : 'text-red-600'">{{ formatMoney(totalCaixa) }}</div>
           <div class="text-xs text-slate-500 mt-0.5">no caixa (fim do mês)</div>
+        </div>
+      </div>
+
+      <!-- LUCRO BRUTO DO MÊS (a conta inteira) -->
+      <div v-if="lucro" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden mb-6" data-campo="lucro-bruto">
+        <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-slate-900 cursor-help w-fit" v-dica="AJUDA.lucroBruto">Lucro bruto de <span class="capitalize">{{ detalhe?.label }}</span></h3>
+            <p class="text-xs text-slate-500 mt-0.5">O que a empresa ganhou no mês, antes das despesas.</p>
+          </div>
+          <button @click="verGraficoLucro = true" class="h-9 px-3.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-xs flex items-center gap-2 w-fit">
+            <BarChart3 class="w-4 h-4 text-emerald-600" /> Ver todos os meses
+          </button>
+        </div>
+        <div class="px-5 py-3 text-sm">
+          <div v-for="l in linhasLucro" :key="l.nome" class="flex justify-between gap-4 py-1.5 border-b border-dashed border-slate-100">
+            <span class="text-slate-600"><span class="inline-block w-4 text-slate-400 font-semibold">{{ l.sinal }}</span>{{ l.nome }}</span>
+            <span class="tabular-nums font-medium" :class="l.sinal === '−' ? 'text-red-600' : 'text-slate-800'">{{ l.sinal === '−' ? '− ' : '' }}{{ formatMoney(l.valor) }}</span>
+          </div>
+          <div class="flex justify-between gap-4 pt-3 pb-1">
+            <span class="font-semibold text-slate-900"><span class="inline-block w-4 text-slate-400">=</span>Lucro bruto</span>
+            <span class="tabular-nums text-lg font-semibold" :class="lucro.lucro_bruto < 0 ? 'text-red-600' : 'text-emerald-700'" data-campo="lucro-bruto-valor">{{ formatMoney(lucro.lucro_bruto) }}</span>
+          </div>
+          <p v-if="lucro.iof" class="text-xs text-slate-500 pt-1">IOF cobrado nos borderôs do mês: {{ formatMoney(lucro.iof) }} — não entra no lucro, é repassado ao governo.</p>
         </div>
       </div>
 
@@ -265,7 +312,7 @@ const irPara = (i) => {
             Lançamentos de <span class="capitalize">{{ detalhe?.label }}</span>
           </h3>
           <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
-            {{ detalhe?.lancamentos?.length || 0 }} lançamentos
+            {{ detalhe?.lancamentos_total || 0 }} lançamentos
           </span>
         </div>
 
@@ -302,6 +349,15 @@ const irPara = (i) => {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div v-if="(detalhe?.lancamentos_paginas || 1) > 1" class="px-5 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500" data-campo="paginas-lancamentos">
+          <span class="tabular-nums">Página {{ paginaLanc }} de {{ detalhe.lancamentos_paginas }}</span>
+          <div class="flex gap-1.5">
+            <button @click="carregarDetalhe(paginaLanc - 1)" :disabled="paginaLanc <= 1" aria-label="Página anterior"
+                    class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"><ArrowLeft class="w-4 h-4" /></button>
+            <button @click="carregarDetalhe(paginaLanc + 1)" :disabled="paginaLanc >= detalhe.lancamentos_paginas" aria-label="Próxima página"
+                    class="h-8 w-8 flex items-center justify-center bg-white border border-slate-300 rounded-lg shadow-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"><ArrowRight class="w-4 h-4" /></button>
+          </div>
         </div>
       </div>
     </div>

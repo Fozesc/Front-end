@@ -160,7 +160,7 @@ const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/vales']">Vales</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/vales']">Vales</h1>
         <p class="text-slate-500 text-sm mt-1">Adiantamentos que saem do caixa e voltam aos poucos ou de uma vez. Clique num vale para ver os pagamentos.</p>
       </div>
       <button @click="abrirNovo" class="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-colors">

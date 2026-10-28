@@ -15,7 +15,6 @@ import {
   LogOut, 
   Menu, 
   X, 
-  Wallet,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
@@ -52,12 +51,14 @@ const secoes = [
     { name: 'Ajustes', path: '/configuracoes', icon: Settings }
   ] }
 ];
+let usuario = {};
+try { usuario = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { usuario = {}; }
+// Auditoria e' so do Admin (o servidor tambem barra); para os outros o item nem aparece
+if (usuario.role !== 'Admin') secoes[2].itens = secoes[2].itens.filter(i => i.path !== '/auditoria');
 const navigation = secoes.flatMap(s => s.itens);
 // /clientes/12 tambem acende "Clientes"
 const ativo = (path) => route.path === path || (path !== '/' && route.path.startsWith(path + '/'));
 
-let usuario = {};
-try { usuario = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { usuario = {}; }
 const iniciais = (usuario.name || '?').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 
 const toggleMobileSidebar = () => {
@@ -94,9 +95,7 @@ const handleLogout = async () => {
     >
       <div class="h-16 flex items-center px-4 flex-shrink-0" :class="isSidebarCollapsed ? 'justify-center px-0' : ''">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-inset ring-white/15">
-            <Wallet class="w-[18px] h-[18px]" />
-          </div>
+          <img src="/logo.png" alt="" width="36" height="36" class="w-9 h-9 flex-shrink-0" data-campo="logo-menu" />
           <div v-show="!isSidebarCollapsed" class="whitespace-nowrap leading-tight">
             <h1 class="text-[15px] font-semibold text-slate-900">Fozesc</h1>
             <p class="text-xs text-slate-500">Gestão de recebíveis</p>
@@ -117,7 +116,7 @@ const handleLogout = async () => {
               :class="ativo(item.path)
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
-              :title="AJUDA[item.path]"
+              v-dica="AJUDA[item.path]"
             >
               <component :is="item.icon" class="w-[18px] h-[18px] flex-shrink-0 transition-colors"
                          :class="[isSidebarCollapsed ? 'mx-auto' : 'mr-3', ativo(item.path) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600']" />
@@ -167,9 +166,7 @@ const handleLogout = async () => {
         </div>
         <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
           <div class="flex-shrink-0 flex items-center gap-3 px-5 mb-6">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-sm">
-              <Wallet class="w-[18px] h-[18px]" />
-            </div>
+            <img src="/logo.png" alt="" width="36" height="36" class="w-9 h-9" />
             <h1 class="text-lg font-semibold text-slate-900">Fozesc</h1>
           </div>
           <nav class="px-3 space-y-0.5">

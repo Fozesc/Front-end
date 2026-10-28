@@ -71,7 +71,7 @@ const apagada = (id) => {
   <DashboardLayout>
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/calculos']">Cálculos</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/calculos']">Cálculos</h1>
         <p class="text-slate-500 text-sm mt-1">Contas livres, uma por linha, com o resultado ao lado. Tudo fica salvo sozinho.</p>
       </div>
       <button @click="novaFolha" :disabled="criando" data-campo="nova-folha"

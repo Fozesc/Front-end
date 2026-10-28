@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Lock, User, ArrowRight, Wallet, AlertTriangle } from 'lucide-vue-next';
+import { Lock, User, ArrowRight, AlertTriangle } from 'lucide-vue-next';
 import api from '../services/api'; // Certifique-se que o axios está configurado
 
 const router = useRouter();
@@ -35,6 +35,8 @@ const handleLogin = async () => {
     console.error(err);
     if (err.response && err.response.status === 401) {
       error.value = 'Usuário ou senha incorretos.';
+    } else if (err.response && err.response.status === 429) {
+      error.value = 'Muitas tentativas erradas. Espere alguns minutos e tente de novo.';
     } else {
       error.value = 'Erro ao conectar com o servidor.';
     }
@@ -50,10 +52,8 @@ const handleLogin = async () => {
 
     <div class="relative w-full max-w-sm">
       <div class="flex flex-col items-center mb-8">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-inset ring-white/20">
-          <Wallet class="w-7 h-7" />
-        </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Fozesc</h1>
+        <img src="/logo.png" alt="" width="96" height="96" class="w-24 h-24 drop-shadow-lg" data-campo="logo-login" />
+        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">Fozesc</h1>
       </div>
 
       <div class="bg-white rounded-2xl shadow-xl ring-1 ring-slate-200/70 p-7">

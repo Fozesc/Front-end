@@ -267,7 +267,7 @@ const linhas = computed(() => {
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/fluxo-caixa']">Fluxo de Caixa</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/fluxo-caixa']">Fluxo de Caixa</h1>
         <p class="text-slate-500 text-sm mt-1">Saldos por conta, dinheiro na rua e lançamentos.</p>
       </div>
       <div class="flex gap-2.5">

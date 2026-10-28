@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   ArrowLeft, Printer, CreditCard, AlertTriangle, 
-  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote, FileDown
+  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote, FileDown, Award
 } from 'lucide-vue-next';
 import ClienteNotas from '../components/layout/ClienteNotas.vue';
 import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
@@ -14,6 +14,8 @@ import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vu
 import api from '../services/api';
 import { baixarRelatorioClientePdf } from '../utils/relatorioClientePdf';
 import { baixarFichaClientePdf } from '../utils/fichaClientePdf';
+import { LINHAS_REPUTACAO, REGRA_REPUTACAO } from '../utils/reputacao';
+import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 
 // --- SERVIÇOS ---
 import clientService from '../services/clientService';
@@ -55,22 +57,69 @@ const cliente = ref({
 });
 
 const operacoesDoCliente = ref([]); 
+const reputacao = ref(null);
 
+
+// um borderô do servidor no formato da tela (e dos PDFs)
+const formatarOperacao = (op, hoje) => {
+  const chequesFormatados = (Array.isArray(op.cheques) ? op.cheques : []).map(c => ({
+    id: c.id,
+    tipo: c.type,
+    vencimento: c.due_date,
+    valor: Number(c.amount || 0),
+    status: c.status || 'Aguardando',
+    banco: c.bank || 'Manual',
+    num_doc: c.number || 'S/N',
+    emitente: c.issuer_name || 'Titular',
+    juros: Number(c.interest_amount || 0),
+    pagamento: c.payment_date,
+    isAtrasado: (c.status === 'Atrasado') || (c.status === 'Aguardando' && c.due_date < hoje)
+  }));
+  const todosPagos = chequesFormatados.length > 0 && chequesFormatados.every(c => ['Pago', 'Compensado'].includes(c.status));
+  return {
+    id: op.id,
+    data: op.date,
+    total: chequesFormatados.reduce((sum, c) => sum + c.valor, 0),
+    face: Number(op.total_face_value || 0),
+    juros: Number(op.total_interest || 0),
+    iof: Number(op.iof_amount || 0),
+    comissao: Number(op.comissao_valor || 0),
+    liquido: Number(op.total_net_value || 0),
+    taxa: op.monthly_rate,
+    statusGeral: todosPagos ? 'Concluída' : 'Em Aberto',
+    temAtraso: chequesFormatados.some(c => c.isAtrasado),
+    cheques: chequesFormatados
+  };
+};
+const hojeIso = () => new Date().toLocaleDateString('en-CA');
+
+// borderôs em paginas de 10: cliente antigo tem centenas e a ficha ficava pesada
+const paginaOps = ref(1);
+const totalPaginasOps = ref(1);
+const totalOps = ref(0);
+const carregandoOps = ref(false);
+const carregarOperacoes = async (pagina = 1) => {
+  carregandoOps.value = true;
+  try {
+    const res = await operationService.getByClient(Number(route.params.id), pagina);
+    operacoesDoCliente.value = (res.items || []).map(op => formatarOperacao(op, hojeIso()));
+    paginaOps.value = res.page || 1;
+    totalPaginasOps.value = res.pages || 1;
+    totalOps.value = res.total || 0;
+    const primeira = operacoesDoCliente.value[0]?.id;
+    if (primeira && !expandedOps.value.includes(primeira)) expandedOps.value.push(primeira);
+  } catch (error) {
+    console.error('Erro ao carregar borderôs:', error);
+  } finally {
+    carregandoOps.value = false;
+  }
+};
 
 const carregarTudo = async () => {
   loading.value = true;
   const idCliente = Number(route.params.id);
-  const hoje = new Date().toISOString().split('T')[0];
-
   try {
-    const [dadosCliente, opsDoCliente] = await Promise.all([
-      clientService.getById(idCliente),
-      operationService.getByClient(idCliente)
-    ]);
-
-    const listaOps = Array.isArray(opsDoCliente) ? opsDoCliente : [];
-
-    
+    const [dadosCliente] = await Promise.all([clientService.getById(idCliente), carregarOperacoes(paginaOps.value)]);
     if (dadosCliente) {
       cliente.value = {
         id: dadosCliente.id,
@@ -80,57 +129,16 @@ const carregarTudo = async () => {
         limite: Number(dadosCliente.credit_limit || 0),
         taxa: Number(dadosCliente.standard_rate || 4.00),
         obs: dadosCliente.notes || '',
-        // --- MAPEAMENTO DOS NOVOS CAMPOS DE ENDEREÇO ---
         endereco: dadosCliente.address || '',
         bairro: dadosCliente.neighborhood || '',
         cidade: dadosCliente.city || '',
         estado: dadosCliente.state || '',
         cep: dadosCliente.zip_code || ''
       };
+      reputacao.value = dadosCliente.reputacao || null;
+      totalEmAbertoGlobal.value = Number(dadosCliente.valor_em_aberto || 0);
+      totalDevolvido.value = Number(dadosCliente.valor_devolvido || 0);
     }
-
-   
-    operacoesDoCliente.value = listaOps.map(op => {
-      const listaCheques = Array.isArray(op.cheques) ? op.cheques : [];
-
-      const chequesFormatados = listaCheques.map(c => ({
-        id: c.id,
-        tipo: c.type,
-        vencimento: c.due_date,
-        valor: Number(c.amount || 0),
-        status: c.status || 'Aguardando',
-        banco: c.bank || 'Manual',
-        num_doc: c.number || 'S/N',
-        emitente: c.issuer_name || 'Titular',
-        juros: Number(c.interest_amount || 0),
-        pagamento: c.payment_date,
-  
-        isAtrasado: (c.status === 'Atrasado') || (c.status === 'Aguardando' && c.due_date < hoje)
-      }));
-
-      const totalOp = chequesFormatados.reduce((sum, c) => sum + c.valor, 0);
-      const todosPagos = chequesFormatados.length > 0 && chequesFormatados.every(c => ['Pago', 'Compensado'].includes(c.status));
-      const temAtraso = chequesFormatados.some(c => c.isAtrasado);
-
-      return {
-        id: op.id,
-        data: op.date, 
-        total: totalOp,
-        face: Number(op.total_face_value || 0),
-        juros: Number(op.total_interest || 0),
-        iof: Number(op.iof_amount || 0),
-        comissao: Number(op.comissao_valor || 0),
-        liquido: Number(op.total_net_value || 0),
-        taxa: op.monthly_rate,
-        statusGeral: todosPagos ? 'Concluída' : 'Em Aberto',
-        temAtraso: temAtraso,
-        cheques: chequesFormatados
-      };
-    });
-
-    const primeira = operacoesDoCliente.value[0]?.id;
-    if (primeira && !expandedOps.value.includes(primeira)) expandedOps.value.push(primeira);
-
   } catch (error) {
     console.error("Erro ao carregar ficha:", error);
   } finally {
@@ -175,34 +183,10 @@ const alterarStatus = async (cheque, novoStatus) => {
 };
 
 
-const totalEmAbertoGlobal = computed(() => {
-  let total = 0;
-  if (!operacoesDoCliente.value) return 0;
-  operacoesDoCliente.value.forEach(op => {
-    if (op.cheques) {
-      op.cheques.forEach(c => {
-        // tudo que nao foi pago, igual ao limite que o borderô confere
-        if (!['Pago', 'Compensado'].includes(c.status)) {
-          total += c.valor;
-        }
-      });
-    }
-  });
-  return total;
-});
-
-const totalDevolvido = computed(() => {
-  let total = 0;
-  if (!operacoesDoCliente.value) return 0;
-  operacoesDoCliente.value.forEach(op => {
-    if (op.cheques) {
-      op.cheques.forEach(c => {
-        if (c.status === 'Devolvido') total += c.valor;
-      });
-    }
-  });
-  return total;
-});
+// vem do servidor (todos os borderôs, nao so a pagina na tela): o mesmo em aberto que o limite
+// do borderô confere
+const totalEmAbertoGlobal = ref(0);
+const totalDevolvido = ref(0);
 
 // Computed para formatar o endereço completo em uma linha (se existir)
 const enderecoCompleto = computed(() => {
@@ -237,18 +221,28 @@ const getStatusColor = (s, isAtrasado) => {
   }
 };
 
-const dadosDoPdf = () => ({
+// o PDF leva TODOS os borderôs: busca as paginas de 50 so na hora de gerar
+const todasOperacoes = async () => {
+  const lista = [];
+  for (let pagina = 1, paginas = 1; pagina <= paginas; pagina++) {
+    const res = await operationService.getByClient(Number(route.params.id), pagina, 50);
+    paginas = res.pages || 1;
+    lista.push(...(res.items || []).map(op => formatarOperacao(op, hojeIso())));
+  }
+  return lista;
+};
+const dadosDoPdf = async () => ({
   empresa: empresa.value.nome,
   cnpj: empresa.value.cnpj,
   cliente: { ...cliente.value, enderecoCompleto: enderecoCompleto.value },
-  operacoes: operacoesDoCliente.value,
+  operacoes: await todasOperacoes(),
   emAberto: totalEmAbertoGlobal.value,
 });
 
 const gerarRelatorioPdf = async () => {
   gerandoPdf.value = true;
   try {
-    await baixarRelatorioClientePdf(dadosDoPdf());
+    await baixarRelatorioClientePdf(await dadosDoPdf());
   } catch (e) {
     console.error(e);
     avisar('Não foi possível gerar o PDF do relatório. Tente de novo.');
@@ -262,7 +256,7 @@ const gerandoFicha = ref(false);
 const exportarFicha = async () => {
   gerandoFicha.value = true;
   try {
-    await baixarFichaClientePdf(dadosDoPdf());
+    await baixarFichaClientePdf(await dadosDoPdf());
   } catch (e) {
     console.error(e);
     avisar('Não foi possível gerar a ficha em PDF. Tente de novo.');
@@ -286,7 +280,7 @@ const exportarFicha = async () => {
             <ArrowLeft class="w-[18px] h-[18px]" />
           </button>
           <div>
-            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/clientes/detalhe']">{{ cliente.nome }}</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/clientes/detalhe']">{{ cliente.nome }}</h1>
             <p class="text-slate-500 text-sm mt-0.5">Ficha cadastral e operacional</p>
           </div>
         </div>
@@ -306,7 +300,7 @@ const exportarFicha = async () => {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80">
           <div class="flex items-center gap-2.5 mb-4 text-sm font-semibold text-slate-900">
             <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><FileText class="w-4 h-4" /></span> Dados cadastrais
@@ -360,6 +354,23 @@ const exportarFicha = async () => {
             <CheckCircle class="w-5 h-5" /> Nenhuma pendência
           </div>
         </div>
+
+        <div v-if="reputacao" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80" data-campo="reputacao">
+          <div class="flex items-center gap-2.5 mb-2 text-sm font-semibold text-slate-900 cursor-help w-fit" v-dica="REGRA_REPUTACAO">
+            <span class="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 ring-1 ring-inset ring-violet-100 flex items-center justify-center"><Award class="w-4 h-4" /></span> Reputação
+          </div>
+          <MedidorReputacao :reputacao="reputacao" class="mb-3" />
+          <p v-if="reputacao.nota === null" class="text-xs text-slate-500 mb-3 text-center">Poucos títulos vencidos para dar uma nota ({{ reputacao.avaliados }} de 3).</p>
+          <div class="space-y-1 text-xs border-t border-slate-100 pt-2.5">
+            <template v-for="l in LINHAS_REPUTACAO" :key="l.id">
+              <div v-if="reputacao.contagem[l.id]" class="flex justify-between">
+                <span class="text-slate-500">{{ l.nome }}<template v-if="l.id === 'atrasado' && reputacao.atraso_medio_dias"> (média {{ reputacao.atraso_medio_dias }} dias)</template></span>
+                <span class="font-semibold tabular-nums" :class="l.cor">{{ reputacao.contagem[l.id] }}</span>
+              </div>
+            </template>
+            <div v-if="reputacao.contagem.a_vencer" class="flex justify-between"><span class="text-slate-400">A vencer (não contam)</span><span class="text-slate-500 tabular-nums">{{ reputacao.contagem.a_vencer }}</span></div>
+          </div>
+        </div>
       </div>
 
       <div class="flex bg-slate-100 p-1 rounded-lg gap-0.5 w-fit mb-4" role="tablist">
@@ -379,7 +390,10 @@ const exportarFicha = async () => {
       <ClienteNotas v-if="cliente.id" v-show="aba === 'notas'" :cliente-id="cliente.id" @total="totalNotas = $event" />
 
       <div v-show="aba === 'operacoes'" class="space-y-4">
-        <h3 class="font-semibold text-slate-900 text-base">Histórico de operações</h3>
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-900 text-base">Histórico de operações</h3>
+          <span v-if="totalOps" class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium tabular-nums">{{ totalOps }} borderô{{ totalOps === 1 ? '' : 's' }}</span>
+        </div>
 
         <div v-if="loading" class="text-center py-10 text-slate-400 flex flex-col items-center">
           <Loader2 class="w-8 h-8 animate-spin mb-2 text-indigo-500" />
@@ -473,6 +487,17 @@ const exportarFicha = async () => {
             </table>
           </div>
 
+        </div>
+
+        <div v-if="totalPaginasOps > 1" class="flex items-center justify-between text-xs text-slate-500 pt-1" data-campo="paginas-borderos">
+          <span class="tabular-nums">Página {{ paginaOps }} de {{ totalPaginasOps }}</span>
+          <div class="flex items-center gap-1.5">
+            <Loader2 v-if="carregandoOps" class="w-4 h-4 animate-spin text-slate-400" />
+            <button @click="carregarOperacoes(paginaOps - 1)" :disabled="paginaOps <= 1 || carregandoOps"
+                    class="h-8 px-3 bg-white border border-slate-300 rounded-lg shadow-xs text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40">Mais novos</button>
+            <button @click="carregarOperacoes(paginaOps + 1)" :disabled="paginaOps >= totalPaginasOps || carregandoOps"
+                    class="h-8 px-3 bg-white border border-slate-300 rounded-lg shadow-xs text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40">Mais antigos</button>
+          </div>
         </div>
       </div>
     </div>

@@ -285,7 +285,7 @@ const resetFilters = () => {
     <div class="print:hidden">
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/cheques']">Títulos</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/cheques']">Títulos</h1>
           <div class="text-slate-500 text-sm mt-1">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> registros</div>
         </div>
         <div class="flex gap-2.5">

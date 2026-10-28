@@ -37,7 +37,8 @@ const salvar = async () => {
   try {
     const dados = {
       titulo: form.titulo, data: form.data, tipo: form.tipo, cliente_id: form.cliente_id, descricao: form.descricao,
-      ...(form.comValor ? { valor: Number(form.valor), previsao: form.previsao, concluido: form.concluido } : {})
+      concluido: form.concluido,
+      ...(form.comValor ? { valor: Number(form.valor), previsao: form.previsao } : {})
     };
     if (e) await calendarioService.editar(e.id, dados); else await calendarioService.criar(dados);
     emit('salvo');
@@ -112,12 +113,13 @@ const segmento = (ativo) => ['flex-1 px-3 rounded-[5px] text-[13px] font-medium 
               <button type="button" role="radio" :aria-checked="form.previsao === 'saida'" @click="form.previsao = 'saida'"
                       :class="[segmento(form.previsao === 'saida'), form.previsao === 'saida' ? '!text-red-700' : '']">Vai sair</button>
             </div>
-            <label class="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
-              <input type="checkbox" v-model="form.concluido" class="w-4 h-4 mt-px accent-indigo-600" />
-              <span><b>Já aconteceu</b> (o dinheiro já está no caixa): sai da previsão para não contar duas vezes.</span>
-            </label>
           </div>
         </div>
+
+        <label v-if="e || form.comValor" class="flex items-start gap-2 text-[13px] text-slate-700 cursor-pointer">
+          <input type="checkbox" v-model="form.concluido" class="w-4 h-4 mt-0.5 accent-indigo-600" data-campo="evento-feito" />
+          <span><b>Já foi feito</b> (sai dos avisos do sininho{{ form.comValor ? ' e da previsão: o dinheiro já está no caixa' : '' }})</span>
+        </label>
 
         <div v-if="erro" class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md font-medium flex items-start gap-2">
           <AlertTriangle class="w-4 h-4 mt-0.5 flex-shrink-0" /> {{ erro }}

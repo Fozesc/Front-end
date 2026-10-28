@@ -146,7 +146,7 @@ const deleteUser = (id) => {
         fetchUsers();
         showAlert('Sucesso', 'Usuário excluído com sucesso!', 'success');
       } catch (error) {
-        showAlert('Erro', 'Erro ao excluir usuário.', 'error');
+        showAlert('Erro', error.response?.data?.error || 'Erro ao excluir usuário.', 'error');
       }
     }, 
     'danger'
@@ -155,7 +155,7 @@ const deleteUser = (id) => {
 
 onMounted(() => {
   fetchSettings();
-  fetchUsers();
+  if (ehAdmin) fetchUsers();
 });
 </script>
 
@@ -243,7 +243,7 @@ onMounted(() => {
 
     <div class="flex items-center gap-3 mb-7">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/configuracoes']">Configurações</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/configuracoes']">Configurações</h1>
         <p class="text-slate-500 text-sm mt-1">Parâmetros do sistema e gestão de equipe.</p>
       </div>
     </div>
@@ -321,7 +321,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+    <div v-if="ehAdmin" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><Users class="w-[18px] h-[18px]" /></div>

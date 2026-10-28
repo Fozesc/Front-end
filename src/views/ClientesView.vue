@@ -10,6 +10,8 @@ import {
   ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone, Merge
 } from 'lucide-vue-next';
 import clientService from '../services/clientService';
+import { REGRA_REPUTACAO } from '../utils/reputacao';
+import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import MesclarClienteModal from '../components/layout/finance/MesclarClienteModal.vue';
 
 const router = useRouter();
@@ -169,7 +171,7 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
     <div class="print:hidden">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/clientes']">Clientes</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/clientes']">Clientes</h1>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-slate-500 text-sm">Total de <span class="font-semibold text-slate-700">{{ totalItems }}</span> clientes</span>
             <span v-if="loading" class="text-xs text-indigo-600 font-medium ml-2 flex items-center">
@@ -217,12 +219,13 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
                 <th class="px-3 py-2.5 text-right">Taxa</th>
                 <th class="px-3 py-2.5 text-right whitespace-nowrap">Em aberto / Limite</th>
                 <th class="px-3 py-2.5 text-center">Títulos</th>
+                <th class="px-3 py-2.5 cursor-help" v-dica="REGRA_REPUTACAO">Reputação</th>
                 <th class="px-3 py-2.5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-if="clientes.length === 0 && !loading">
-                <td colspan="7" class="px-3 py-8 text-center text-slate-500">Nenhum cliente encontrado.</td>
+                <td colspan="8" class="px-3 py-8 text-center text-slate-500">Nenhum cliente encontrado.</td>
               </tr>
               <tr 
                 v-for="cliente in clientes" 
@@ -260,6 +263,10 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
                 <td class="px-3 py-2.5 text-center tabular-nums whitespace-nowrap" title="em aberto / total">
                   <span class="font-semibold text-slate-800">{{ cliente.cheques_ativos }}</span>
                   <span class="text-slate-400"> / {{ cliente.cheques_totais }}</span>
+                </td>
+
+                <td class="px-3 py-2.5 whitespace-nowrap">
+                  <MedidorReputacao v-if="cliente.reputacao" :reputacao="cliente.reputacao" tamanho="mini" />
                 </td>
 
                 <td class="px-3 py-1.5 text-right">

@@ -156,7 +156,7 @@ const botaoIcone = 'p-1.5 rounded-lg text-slate-400 transition-colors align-midd
   <DashboardLayout>
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/recorrentes']">Despesas recorrentes</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/recorrentes']">Despesas recorrentes</h1>
         <p class="text-slate-500 text-sm mt-1">Contas que se repetem: o débito automático lança sozinho no caixa; a manual espera você lançar o valor do mês.</p>
       </div>
       <button @click="novo" data-campo="nova-recorrente"

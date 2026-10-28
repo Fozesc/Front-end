@@ -13,6 +13,10 @@ export default {
   emitentes(q) {
     return api.get('/checks/emitentes', { params: { q, limit: 10 } }).then(res => res.data);
   },
+  // sem nome: quem concentra mais dinheiro e quem mais deu problema; com nome: so aquele emitente
+  riscoEmitentes(nome) {
+    return api.get('/checks/emitentes/risco', { params: nome === undefined ? {} : { nome } }).then(res => res.data);
+  },
   getPortfolioTotal() {
     return api.get('/checks/portfolio-total').then(res => res.data);
   },

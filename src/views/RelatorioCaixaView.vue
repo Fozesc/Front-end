@@ -102,7 +102,7 @@ const segmento = (ativo) => ['flex-1 px-3 rounded-[5px] text-[13px] font-medium 
     <div class="space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/relatorio-caixa']">Relatório do Caixa</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/relatorio-caixa']">Relatório do Caixa</h1>
           <p class="text-slate-500 text-sm mt-0.5">Entradas e saídas de cada conta, com o extrato para rastrear cada lançamento.</p>
         </div>
         <button @click="baixarPdf" :disabled="!dados || gerandoPdf" data-campo="baixar-pdf"

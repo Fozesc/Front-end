@@ -3,6 +3,9 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import RelatorioModal from '../components/layout/RelatorioModal.vue';
+import AvisosCalendario from '../components/layout/AvisosCalendario.vue';
+import RiscoEmitentes from '../components/layout/RiscoEmitentes.vue';
+import AlertaBackup from '../components/layout/AlertaBackup.vue';
 import { 
   Wallet, TrendingUp, AlertTriangle, Calendar, FileText, Users, DollarSign, Activity, Download,
   CalendarClock, X
@@ -248,11 +251,12 @@ const chartOptionsLine = {
 
     <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-7 gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/']">Visão Geral</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/']">Visão Geral</h1>
         <p class="text-slate-500 text-sm mt-1">Resumo financeiro em tempo real.</p>
       </div>
 
       <div class="flex gap-2.5">
+        <AvisosCalendario />
         <div class="bg-white h-9 px-3.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 flex items-center shadow-xs">
           <Calendar class="w-4 h-4 mr-2 text-slate-400" /> {{ new Date().toLocaleDateString('pt-BR') }}
         </div>
@@ -261,6 +265,8 @@ const chartOptionsLine = {
         </button>
       </div>
     </div>
+
+    <AlertaBackup />
 
     <div v-if="mostrarAvisoHoje" class="mb-6 bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex items-center gap-4 shadow-xs">
       <div class="w-10 h-10 bg-white text-amber-600 rounded-lg ring-1 ring-inset ring-amber-200 flex items-center justify-center shrink-0"><CalendarClock class="w-5 h-5" /></div>
@@ -284,7 +290,7 @@ const chartOptionsLine = {
       <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200 flex items-center justify-center"><Wallet class="w-[18px] h-[18px]" /></div>
-          <span class="text-sm font-medium text-slate-500">Capital social</span>
+          <span class="text-sm font-medium text-slate-500 cursor-help" v-dica="AJUDA.capital">Capital social</span>
         </div>
         <div class="mt-4 text-xl xl:text-2xl font-semibold text-slate-900 tracking-tight tabular-nums truncate">{{ formatMoney(kpis.capital) }}</div>
         <div class="text-xs text-slate-500 mt-1">valor investido</div>
@@ -292,7 +298,7 @@ const chartOptionsLine = {
       <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100 flex items-center justify-center"><TrendingUp class="w-[18px] h-[18px]" /></div>
-          <span class="text-sm font-medium text-slate-500">Lucro acumulado</span>
+          <span class="text-sm font-medium text-slate-500 cursor-help" v-dica="AJUDA.lucroAcumulado">Lucro acumulado</span>
         </div>
         <div class="mt-4 text-xl xl:text-2xl font-semibold text-slate-900 tracking-tight tabular-nums truncate">{{ formatMoney(kpis.lucro) }}</div>
         <div class="text-xs text-slate-500 mt-1">juros de cheques já pagos</div>
@@ -300,7 +306,7 @@ const chartOptionsLine = {
       <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><DollarSign class="w-[18px] h-[18px]" /></div>
-          <span class="text-sm font-medium text-slate-500">Em carteira</span>
+          <span class="text-sm font-medium text-slate-500 cursor-help" v-dica="AJUDA.carteira">Em carteira</span>
         </div>
         <div class="mt-4 text-xl xl:text-2xl font-semibold text-slate-900 tracking-tight tabular-nums truncate">{{ formatMoney(kpis.carteira) }}</div>
         <div class="text-xs text-slate-500 mt-1">a receber</div>
@@ -308,7 +314,7 @@ const chartOptionsLine = {
       <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-red-50 text-red-600 ring-1 ring-inset ring-red-100 flex items-center justify-center"><AlertTriangle class="w-[18px] h-[18px]" /></div>
-          <span class="text-sm font-medium text-slate-500">Inadimplência</span>
+          <span class="text-sm font-medium text-slate-500 cursor-help" v-dica="AJUDA.inadimplencia">Inadimplência</span>
         </div>
         <div class="mt-4 text-xl xl:text-2xl font-semibold text-red-700 tracking-tight tabular-nums truncate">{{ formatMoney(kpis.inadimplencia) }}</div>
         <div class="text-xs text-red-600 mt-1">Jurídico</div>
@@ -433,5 +439,7 @@ const chartOptionsLine = {
         </div>
       </div>
     </div>
+
+    <RiscoEmitentes class="mt-6" />
   </DashboardLayout>
 </template>

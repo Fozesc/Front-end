@@ -6,12 +6,14 @@ import {
   Search, Activity, User, Eye, X,
   ChevronDown, RotateCcw, Filter, ArrowLeft, ArrowRight, Loader2,
   Clock, Target, Hash, FileText, Plus, Pencil, Trash2, LogIn, LogOut,
-  ShieldAlert, Merge, BadgeDollarSign
+  ShieldAlert, Merge, BadgeDollarSign, HardDriveDownload, OctagonAlert
 } from 'lucide-vue-next';
 import auditService from '../services/auditService';
+import { useRoute } from 'vue-router';
 
 const logs = ref([]);
 const loading = ref(true);
+const semAcesso = ref(false);
 const selectedLog = ref(null);
 
 const totalItems = ref(0);
@@ -23,10 +25,11 @@ const itemsPerPage = 20;
 const acoesDisponiveis = ref([]);
 const alvosDisponiveis = ref([]);
 
+// ?alvo=Backup (vem do aviso de backup da tela inicial) abre ja filtrado
 const filtros = reactive({
   busca: '',
   acao: 'TODOS',
-  alvo: 'TODOS',
+  alvo: String(useRoute().query.alvo || 'TODOS').slice(0, 50),
   dataInicio: '',
   dataFim: ''
 });
@@ -59,6 +62,7 @@ const fetchLogs = async () => {
     totalItems.value = response.total;
     totalPages.value = response.pages || 1;
   } catch (error) {
+    semAcesso.value = error.response?.status === 403;
     console.error("Erro logs:", error);
   } finally {
     loading.value = false;
@@ -121,6 +125,8 @@ const getActionStyle = (action) => {
     case 'MERGE': return 'bg-violet-50 text-violet-700 border-violet-200';
     case 'LOGIN': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     case 'LOGOUT': return 'bg-slate-100 text-slate-600 border-slate-200';
+    case 'BACKUP': return 'bg-sky-50 text-sky-700 border-sky-200';
+    case 'FALHA': return 'bg-orange-600 text-white border-orange-600';
     default: return 'bg-slate-50 text-slate-700 border-slate-200';
   }
 };
@@ -135,6 +141,8 @@ const getActionIcon = (action) => {
     case 'MERGE': return Merge;
     case 'LOGIN': return LogIn;
     case 'LOGOUT': return LogOut;
+    case 'BACKUP': return HardDriveDownload;
+    case 'FALHA': return OctagonAlert;
     default: return Activity;
   }
 };
@@ -143,7 +151,7 @@ const getActionLabel = (action) => {
   const map = {
     CREATE: 'Criação', UPDATE: 'Edição', DELETE: 'Exclusão',
     NEGADO: 'Barrado', BAIXA: 'Baixa', MERGE: 'Mesclagem',
-    LOGIN: 'Login', LOGOUT: 'Logout'
+    LOGIN: 'Login', LOGOUT: 'Logout', BACKUP: 'Backup', FALHA: 'Falha'
   };
   return map[action] || action;
 };
@@ -222,7 +230,7 @@ const formatHora = (iso) => {
 
     <div class="flex items-center gap-3 mb-7">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/auditoria']">Auditoria</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/auditoria']">Auditoria</h1>
         <div class="flex items-center gap-2 mt-1">
           <p class="text-slate-500 text-sm">Tudo que foi feito no sistema, por quem e quando.</p>
           <span v-if="loading" class="text-xs text-indigo-600 font-medium ml-2 flex items-center"><Loader2 class="w-3 h-3 mr-1 animate-spin" /> Buscando...</span>
@@ -294,6 +302,9 @@ const formatHora = (iso) => {
         <button @click="filtros.acao = 'DELETE'" class="h-7 px-3 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors flex items-center gap-1">
           <Trash2 class="w-3 h-3" /> Exclusões
         </button>
+        <button @click="filtros.alvo = 'Backup'" v-dica="AJUDA.auditBackups" class="h-7 px-3 text-xs font-medium rounded-full bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors flex items-center gap-1">
+          <HardDriveDownload class="w-3 h-3" /> Backups
+        </button>
       </div>
     </div>
 
@@ -313,12 +324,12 @@ const formatHora = (iso) => {
           <tbody class="divide-y divide-slate-100">
             <tr v-if="logs.length === 0 && !loading">
               <td colspan="6" class="px-6 py-10 text-center text-slate-400">
-                {{ temFiltro ? 'Nenhum registro com esses filtros.' : 'Nenhum registro encontrado.' }}
+                {{ semAcesso ? 'Só o administrador vê a auditoria.' : temFiltro ? 'Nenhum registro com esses filtros.' : 'Nenhum registro encontrado.' }}
               </td>
             </tr>
             <tr v-for="log in logs" :key="log.id"
                 class="hover:bg-slate-50 cursor-pointer group transition-colors"
-                :class="log.action === 'NEGADO' ? 'bg-rose-50/60 hover:bg-rose-50' : ''"
+                :class="log.action === 'NEGADO' ? 'bg-rose-50/60 hover:bg-rose-50' : log.action === 'FALHA' ? 'bg-orange-50/60 hover:bg-orange-50' : ''"
                 @click="selectedLog = log">
               <td class="px-4 py-2.5 tabular-nums text-xs text-slate-500">
                 <div class="text-slate-800 font-medium text-[13px]">{{ formatHora(log.date).data }}</div>

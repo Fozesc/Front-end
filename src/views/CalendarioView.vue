@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { AJUDA } from '../utils/ajuda';
 import { confirmar } from '../utils/avisos';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
@@ -13,13 +14,17 @@ import {
 
 const iso = (d) => d.toLocaleDateString('en-CA');
 const hojeIso = iso(new Date());
-const mes = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+// ?dia=AAAA-MM-DD (vem do sininho da tela inicial) abre o calendario ja naquele dia
+const pedido = String(useRoute().query.dia || '');
+const diaPedido = /^\d{4}-\d{2}-\d{2}$/.test(pedido) ? pedido : null;
+const inicioDoMes = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+const mes = ref(inicioDoMes(diaPedido ? new Date(`${diaPedido}T12:00:00`) : new Date()));
 const filtro = reactive({ clienteId: null });
 const camadas = reactive({ cheques: true, evento: true, nota: true, lembrete: true });
 const dados = ref(null);
 const carregando = ref(false);
 const erro = ref('');
-const diaSel = ref(hojeIso);
+const diaSel = ref(diaPedido || hojeIso);
 const modal = reactive({ aberto: false, evento: null, data: '' });
 
 const CAMADAS = [
@@ -105,7 +110,7 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
     <div class="space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div>
-          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/calendario']">Calendário</h1>
+          <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/calendario']">Calendário</h1>
           <p class="text-slate-500 text-sm mt-0.5">Cheques por vencimento, eventos, notas e lembretes, com a previsão do caixa.</p>
         </div>
         <button @click="novo()" data-campo="novo-evento" class="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-semibold shadow-xs flex items-center gap-2">
@@ -113,7 +118,8 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
         </button>
       </div>
 
-      <!-- previsao: metodo do sistema financeiro -->
+
+      <!-- previsao: metodo do sistema financeiro (so aqui em cima; o previsto dia a dia saiu da grade) -->
       <section v-if="dados" class="grid grid-cols-2 lg:grid-cols-5 gap-3" data-campo="previsao">
         <div class="bg-slate-900 rounded-lg p-4">
           <div class="text-xs font-medium text-slate-400">Saldo do caixa</div>
@@ -178,20 +184,13 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
                 <span class="truncate" :class="e.concluido ? 'line-through text-slate-400' : ''">{{ e.titulo }}</span>
               </div>
               <div v-if="(porDia[d.iso]?.eventos.length || 0) > 2" class="text-[10px] text-slate-400">+ {{ porDia[d.iso].eventos.length - 2 }}</div>
-              <div v-if="dados?.saldo_previsto?.[d.iso] !== undefined" class="mt-auto text-[10px] tabular-nums"
-                   :class="dados.saldo_previsto[d.iso] < 0 ? 'text-red-500' : 'text-slate-400'" :title="'Saldo previsto: ' + moeda(dados.saldo_previsto[d.iso])">
-                prev. {{ curta(dados.saldo_previsto[d.iso]) }}
-              </div>
             </button>
           </div>
         </section>
 
         <aside class="bg-white border border-slate-200 rounded-lg shadow-xs xl:sticky xl:top-4" data-campo="painel-dia">
           <header class="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2">
-            <div>
-              <h2 class="text-sm font-semibold text-slate-900">{{ dataLonga(diaSel) }}</h2>
-              <p v-if="dados?.saldo_previsto?.[diaSel] !== undefined" class="text-xs text-slate-500">Saldo previsto: <b class="tabular-nums" :class="dados.saldo_previsto[diaSel] < 0 ? 'text-red-600' : 'text-slate-800'">{{ moeda(dados.saldo_previsto[diaSel]) }}</b></p>
-            </div>
+            <h2 class="text-sm font-semibold text-slate-900">{{ dataLonga(diaSel) }}</h2>
             <button @click="novo(diaSel)" class="h-8 px-2.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1"><Plus class="w-3.5 h-3.5" /> Adicionar</button>
           </header>
           <div class="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -215,7 +214,7 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
                       <div class="font-medium text-slate-800 mt-1" :class="e.concluido ? 'line-through text-slate-400' : ''">{{ e.titulo }}</div>
                     </div>
                     <div class="flex gap-0.5 flex-shrink-0">
-                      <button v-if="e.valor" @click="concluir(e)" :title="e.concluido ? 'Marcar como pendente' : 'Já aconteceu'" class="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"><CheckCircle2 class="w-4 h-4" /></button>
+                      <button @click="concluir(e)" :title="e.concluido ? 'Marcar como pendente' : 'Marcar como feito'" class="p-1 rounded hover:text-emerald-600 hover:bg-emerald-50" :class="e.concluido ? 'text-emerald-600' : 'text-slate-400'"><CheckCircle2 class="w-4 h-4" /></button>
                       <button @click="editar(e)" title="Editar" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Pencil class="w-4 h-4" /></button>
                       <button @click="apagar(e)" title="Apagar" class="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 class="w-4 h-4" /></button>
                     </div>
@@ -224,8 +223,9 @@ const dataLonga = (d) => maiuscula(new Date(`${d}T12:00:00`).toLocaleDateString(
                   <div class="flex flex-wrap gap-x-3 text-[11px] text-slate-500 mt-1">
                     <span v-if="e.cliente">{{ e.cliente }}</span>
                     <span v-if="e.valor" class="font-semibold" :class="e.previsao === 'entrada' ? 'text-emerald-600' : 'text-red-600'">
-                      {{ e.previsao === 'entrada' ? '+' : '−' }} {{ moeda(e.valor) }}{{ e.concluido ? ' · já aconteceu' : '' }}
+                      {{ e.previsao === 'entrada' ? '+' : '−' }} {{ moeda(e.valor) }}
                     </span>
+                    <span v-if="e.concluido" class="text-emerald-600 font-semibold">feito</span>
                     <span>por {{ e.autor }}</span>
                   </div>
                 </li>

@@ -14,6 +14,8 @@ import ComissaoVale from '../components/layout/finance/ComissaoVale.vue';
 import api from '../services/api';
 import { motivoNaoUtil, proximoDiaUtil } from '../utils/diasUteis';
 import { CONTAS } from '../utils/contasCaixa';
+import { REGRA_REPUTACAO } from '../utils/reputacao';
+import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import {
   arredondar, calcularDias, calcularLinha, calcularComissao, divisorInverso, iofDasConfiguracoes,
   IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
@@ -54,6 +56,7 @@ const header = reactive({
   clienteTelefone: '',
   clienteLimite: 0,      
   clienteDivida: 0,      
+  clienteReputacao: null,
   emitenteNome: '',
   dataOperacao: new Date().toISOString().split('T')[0],
   taxaMensal: 4.00,
@@ -87,6 +90,8 @@ const gerador = reactive({
 // na importacao da planilha (nome curto x a mesma pessoa com o nome completo).
 const emitentesSugeridos = ref([]);
 const emitenteNovo = ref(false);
+// o que este emitente ja tem com a empresa (em aberto e problemas), para decidir antes de aceitar
+const riscoEmitente = ref(null);
 let timeoutEmitente = null;
 
 const buscarEmitentes = () => {
@@ -105,14 +110,22 @@ const buscarEmitentes = () => {
 // seria chato e apareceria em todo nome pela metade.
 const conferirEmitente = async () => {
   const termo = (header.emitenteNome || '').trim();
+  riscoEmitente.value = null;
   if (termo.length < 3) { emitenteNovo.value = false; return; }
   try {
-    const achados = await checkService.emitentes(termo);
+    const [achados, risco] = await Promise.all([checkService.emitentes(termo), checkService.riscoEmitentes(termo)]);
     emitenteNovo.value = !achados.some(n => n.toLowerCase() === termo.toLowerCase());
+    riscoEmitente.value = risco && (risco.em_aberto > 0 || risco.devolvidos || risco.juridico || risco.vencidos) ? risco : null;
   } catch (e) {
     emitenteNovo.value = false;
   }
 };
+const problemasEmitente = computed(() => {
+  const r = riscoEmitente.value;
+  if (!r) return '';
+  return [r.devolvidos && `${r.devolvidos} devolvido(s)`, r.juridico && `${r.juridico} no jurídico`,
+    r.vencidos && `${r.vencidos} vencido(s) sem pagar`].filter(Boolean).join(', ');
+});
 
 const fetchSettings = async () => {
   try {
@@ -155,7 +168,7 @@ const selecionarCliente = (cliente) => {
   if (!cliente) {
     header.clienteId = null; header.clienteNome = '';
     header.clienteDocumento = ''; header.clienteTelefone = '';
-    header.clienteLimite = 0; header.clienteDivida = 0;
+    header.clienteLimite = 0; header.clienteDivida = 0; header.clienteReputacao = null;
     return;
   }
   header.clienteId = cliente.id;
@@ -165,7 +178,8 @@ const selecionarCliente = (cliente) => {
   if (cliente.standard_rate) header.taxaMensal = cliente.standard_rate;
   header.clienteLimite = cliente.credit_limit || 0;
   header.clienteDivida = cliente.valor_em_aberto || 0; 
-  if (!header.emitenteNome) header.emitenteNome = cliente.name;
+  header.clienteReputacao = cliente.reputacao || null;
+  if (!header.emitenteNome) { header.emitenteNome = cliente.name; conferirEmitente(); }
   recalcularTudo();
 };
 
@@ -330,7 +344,8 @@ const novoBordero = () => {
   gerador.valorAlvo = 0;
   header.clienteId = null; header.clienteNome = '';
   header.clienteDocumento = ''; header.clienteTelefone = '';
-  header.clienteLimite = 0; header.clienteDivida = 0;
+  header.clienteLimite = 0; header.clienteDivida = 0; header.clienteReputacao = null;
+  riscoEmitente.value = null;
   header.comissao = 0;
   abaterVale.value = false;
   valeId.value = null;
@@ -449,7 +464,7 @@ const processarSalvamento = async () => {
         <div class="flex items-center gap-3">
           <button @click="router.back()" aria-label="Voltar" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-300 shadow-xs hover:bg-slate-50 rounded-md text-slate-500"><ArrowLeft class="w-[18px] h-[18px]" /></button>
           <div>
-            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" :title="AJUDA['/bordero']">Cálculo de Borderô</h1>
+            <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/bordero']">Cálculo de Borderô</h1>
             <p class="text-slate-500 text-sm mt-0.5">Novo borderô de cheques ou antecipação.</p>
           </div>
         </div>
@@ -481,6 +496,9 @@ const processarSalvamento = async () => {
               <div v-if="header.clienteId && header.clienteLimite > 0" class="absolute right-0 top-0 text-xs font-medium text-slate-500">
                 Disponível: <span class="tabular-nums" :class="header.clienteLimite - header.clienteDivida < 0 ? 'text-red-600' : 'text-emerald-600'">{{ formatCurrency(header.clienteLimite - header.clienteDivida) }}</span>
               </div>
+              <p v-if="header.clienteId && header.clienteReputacao" class="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 cursor-help" v-dica="REGRA_REPUTACAO" data-campo="reputacao-bordero">
+                Reputação: <MedidorReputacao :reputacao="header.clienteReputacao" tamanho="mini" />
+              </p>
             </div>
             <div class="xl:col-span-5">
               <label for="bordero-emitente" :class="rotulo">Emitente do cheque</label>
@@ -492,6 +510,12 @@ const processarSalvamento = async () => {
               </datalist>
               <p v-if="emitenteNovo" class="text-xs text-amber-700 font-medium mt-1.5 flex items-center gap-1">
                 <AlertTriangle class="w-3 h-3 shrink-0" /> Emitente novo — confira se não é um já cadastrado escrito diferente.
+              </p>
+              <p v-if="riscoEmitente && problemasEmitente" class="text-xs text-red-700 font-medium mt-1.5 flex items-start gap-1 cursor-help" data-campo="risco-emitente" v-dica="AJUDA.emitenteRisco">
+                <AlertTriangle class="w-3 h-3 shrink-0 mt-0.5" /> Atenção: este emitente tem {{ problemasEmitente }}. Já são {{ formatCurrency(riscoEmitente.em_aberto) }} em aberto com ele.
+              </p>
+              <p v-else-if="riscoEmitente" class="text-xs text-slate-500 mt-1.5 cursor-help" data-campo="risco-emitente" v-dica="AJUDA.emitenteRisco">
+                Já tem {{ formatCurrency(riscoEmitente.em_aberto) }} em aberto deste emitente ({{ riscoEmitente.titulos_abertos }} título(s)), sem problema registrado.
               </p>
             </div>
             <div class="xl:col-span-2">

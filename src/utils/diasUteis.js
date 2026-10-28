@@ -18,10 +18,12 @@ const FERIADOS_FIXOS = {
   '12-31': 'Véspera de Ano Novo (sem expediente bancário)',
 };
 
-// Feriados de Foz do Iguaçu / Paraná. Coloque aqui no formato 'MM-DD' (todo ano)
-// ou 'AAAA-MM-DD' (só naquele ano). Ex.: '06-10': 'Aniversário de Foz do Iguaçu'.
-// Está vazio de propósito: feriado municipal errado empurraria cheque sem motivo.
-export const FERIADOS_LOCAIS = {};
+// Feriados de Foz do Iguaçu / Paraná, no formato 'MM-DD' (todo ano) ou 'AAAA-MM-DD'
+// (só naquele ano). Só entra o que é feriado de verdade: feriado errado empurraria
+// cheque sem motivo. O backup (gerar_backup.py, FERIADOS_FIXOS) usa a mesma lista.
+export const FERIADOS_LOCAIS = {
+  '06-10': 'Aniversário de Foz do Iguaçu',
+};
 
 // Páscoa pelo algoritmo de Meeus/Butcher (calendário gregoriano). É dela que saem
 // Carnaval, Sexta-feira Santa e Corpus Christi.
