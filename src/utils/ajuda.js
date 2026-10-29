@@ -28,5 +28,6 @@ export const AJUDA = {
   lucroBruto: 'Juros dos borderôs feitos no mês, mais juros de prorrogação, imposto e multas que entraram no caixa, menos as comissões. As despesas não entram (por isso "bruto").',
   backupFalhou: 'O backup é a cópia de segurança de todo o sistema. Se ele falha, os dados de hoje não estão guardados em outro lugar: veja o motivo na Auditoria (atalho Backups).',
   auditBackups: 'Mostra só o que o backup fez: cópia do banco, envio por e-mail e teste de restauração, com as falhas em laranja.',
+  saidaDividida: 'O líquido sai de mais de uma conta: por exemplo, parte em dinheiro e parte por PIX do BB. Você digita quanto sai de cada uma e a última se completa sozinha.',
   emitenteRisco: 'O que este emitente já tem com a empresa: quanto está em aberto e se tem devolvido, jurídico ou vencido.',
 };

@@ -4,7 +4,7 @@ import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Plus, Trash2, Save, ArrowLeft, Printer, Calculator,
-  AlertTriangle, CheckCircle, Loader2, Building2, CalendarClock, X
+  AlertTriangle, CheckCircle, Loader2, Building2, CalendarClock, X, Split
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import operationService from '../services/operationService';
@@ -13,7 +13,8 @@ import ClientSelect from '../components/inputs/ClientSelect.vue';
 import ComissaoVale from '../components/layout/finance/ComissaoVale.vue';
 import api from '../services/api';
 import { motivoNaoUtil, proximoDiaUtil } from '../utils/diasUteis';
-import { CONTAS } from '../utils/contasCaixa';
+import { CONTAS, partesFecham, partesParaEnviar, somaPartes } from '../utils/contasCaixa';
+import PartesPagamento from '../components/layout/finance/PartesPagamento.vue';
 import { REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import {
@@ -199,6 +200,16 @@ const prazoMedio = computed(() => {
   return bruto > 0 ? Math.round(itens.value.reduce((t, i) => t + Number(i.valor || 0) * Number(i.dias || 0), 0) / bruto) : 0;
 });
 const nomeConta = (id) => CONTAS.find(c => c.id === id)?.nome || id;
+
+// saida dividida (2.11.2): o liquido sai de mais de uma conta, quanto de cada uma. A conta "do
+// borderô" (comissao, linha de total) passa a ser a da maior parte.
+const DIVIDIR = 'dividir';
+const partesSaida = ref([]);
+const dividida = computed(() => header.contaSaida === DIVIDIR);
+const contaPrincipal = computed(() => (!dividida.value ? header.contaSaida
+  : [...partesSaida.value].sort((a, b) => (Number(b.valor) || 0) - (Number(a.valor) || 0))[0]?.conta || 'Dinheiro'));
+const textoSaida = computed(() => (!dividida.value ? nomeConta(header.contaSaida)
+  : partesSaida.value.map(p => `${p.conta} ${formatCurrency(p.valor)}${p.forma && p.forma !== p.conta ? ` (${p.forma})` : ''}`).join(' + ')));
 const emissao = computed(() => emitidoEm.value.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
 
 const comissaoInvalida = computed(() => {
@@ -352,6 +363,7 @@ const exportarBordero = async () => {
 
 const novoBordero = () => {
   modalState.visible = false;
+  partesSaida.value = [{ conta: 'Dinheiro', forma: 'Dinheiro', valor: 0 }, { conta: 'BB', forma: 'PIX', valor: 0 }];
   itens.value = [];
   adicionarLinha();
   gerador.valorAlvo = 0;
@@ -371,6 +383,10 @@ const verificarLimiteESalvar = () => {
   if (!header.clienteId) return showPopup('Atenção', 'Selecione um cliente válido.', 'error');
   if (!header.emitenteNome) return showPopup('Atenção', 'Informe o emitente.', 'error');
   if (itens.value.length === 0 || totais.value.bruto <= 0) return showPopup('Atenção', 'Borderô vazio.', 'error');
+  if (dividida.value && !partesFecham(partesSaida.value, totais.value.liquido)) {
+    return showPopup('Atenção', `A saída dividida tem que somar o líquido do borderô (${formatCurrency(totais.value.liquido)}). `
+      + `Hoje soma ${formatCurrency(somaPartes(partesSaida.value))}.`, 'error');
+  }
   if (itens.value.some(i => !i.vencimento)) return showPopup('Erro', 'Datas inválidas.', 'error');
   const zerado = itens.value.findIndex(i => !(Number(i.valor) > 0) || !(Number(i.liquido) > 0));
   if (zerado >= 0) return showPopup('Atenção', `O cheque ${zerado + 1} está com valor ou líquido zerado/negativo (juros maiores que o cheque). Corrija antes de efetivar.`, 'error');
@@ -401,7 +417,8 @@ const processarSalvamento = async () => {
       operation_date: header.dataOperacao,
       taxa_mensal: header.taxaMensal,
       dias_compensacao: header.diasCompensacao,
-      account_source: header.contaSaida,
+      account_source: contaPrincipal.value,
+      ...(dividida.value ? { partes: partesParaEnviar(partesSaida.value) } : {}),
       iof_amount: totais.value.iof,
       total_net: totais.value.liquido, // valor realmente emprestado (o que sai do caixa) = face - juros - IOF
       notes: header.observacao,
@@ -584,12 +601,24 @@ const processarSalvamento = async () => {
                         :class="[segmento(header.contaSaida === c.id), 'flex items-center justify-center gap-1.5']" :title="c.nome">
                   <component :is="c.icone" class="w-3.5 h-3.5" /> {{ c.curto }}
                 </button>
+                <button type="button" role="radio" :aria-checked="dividida" @click="header.contaSaida = DIVIDIR" data-campo="saida-dividir"
+                        :class="[segmento(dividida), 'flex items-center justify-center gap-1.5']" v-dica="AJUDA.saidaDividida">
+                  <Split class="w-3.5 h-3.5" /> Dividir
+                </button>
               </div>
             </div>
           </div>
 
+          <div v-if="dividida" class="rounded-md border border-indigo-100 bg-indigo-50/40 p-3 space-y-2" data-campo="partes-saida">
+            <p class="text-xs text-slate-600">
+              De onde sai o líquido de <b class="tabular-nums">{{ formatCurrency(totais.liquido) }}</b>: digite quanto sai de uma conta e a
+              última parte se completa sozinha com o que falta.
+            </p>
+            <PartesPagamento v-model="partesSaida" :total="totais.liquido" compacto saida auto-completar />
+          </div>
+
           <div class="rounded-md border border-violet-100 bg-violet-50/50 px-3 py-2.5">
-            <ComissaoVale ref="comissaoVale" v-model="valeId" v-model:ativo="abaterVale" :comissao="comissao.valor" :conta="nomeConta(header.contaSaida)" />
+            <ComissaoVale ref="comissaoVale" v-model="valeId" v-model:ativo="abaterVale" :comissao="comissao.valor" :conta="nomeConta(contaPrincipal)" />
           </div>
 
           <div>
@@ -836,7 +865,7 @@ const processarSalvamento = async () => {
               <span><b>Taxa:</b> {{ virgula(header.taxaMensal) }}% a.m.</span>
               <span><b>Compensação:</b> {{ header.diasCompensacao }} dia(s)</span>
               <span><b>IOF:</b> <template v-if="header.iofEnabled">{{ virgula(header.iofBase) }}% fixo + {{ virgula(header.iofDiario) }}% a.d.</template><template v-else>não cobrado</template></span>
-              <span><b>Pagamento:</b> {{ nomeConta(header.contaSaida) }}</span>
+              <span><b>Pagamento:</b> {{ textoSaida }}</span>
               <span v-if="comissao.valor > 0"><b>Comissão:</b> {{ virgula(header.comissao) }} de {{ virgula(header.taxaMensal) }}% ({{ parteDosJuros }} dos juros)</span>
             </div>
           </div>

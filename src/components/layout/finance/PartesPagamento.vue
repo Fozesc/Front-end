@@ -1,14 +1,17 @@
 <script setup>
-// Editor de pagamento dividido (parte no dinheiro, parte no banco...). Usado no Receber
-// e na prorrogacao: as partes somam `total`.
-import { computed, onMounted } from 'vue';
+// Editor de pagamento dividido (parte no dinheiro, parte no banco...). Usado no Receber, na
+// prorrogacao e na saida do borderô (`saida`): as partes somam `total`. Com `autoCompletar`, a
+// ultima parte se ajusta sozinha com o que falta quando outra muda ou quando o total muda.
+import { computed, onMounted, watch } from 'vue';
 import { Plus, Trash2, CheckCircle2, Divide, Link2 } from 'lucide-vue-next';
 import { CONTAS, FORMAS, ESTILO, arred, somaPartes } from '../../../utils/contasCaixa';
 
 const props = defineProps({
   modelValue: { type: Array, required: true },
   total: { type: Number, required: true },
-  compacto: { type: Boolean, default: false }
+  compacto: { type: Boolean, default: false },
+  saida: { type: Boolean, default: false },
+  autoCompletar: { type: Boolean, default: false }
 });
 const emit = defineEmits(['update:modelValue', 'enviar']);
 
@@ -61,6 +64,16 @@ const trocarConta = (parte, conta) => {
 const usarRestante = (parte) => {
   parte.valor = arred((Number(parte.valor) || 0) + restante.value);
 };
+
+// a ultima parte recebe o que falta para fechar (nunca negativo)
+const completarUltima = () => {
+  const lista = partes.value;
+  if (!props.autoCompletar || lista.length < 2) return;
+  const outras = somaPartes(lista.slice(0, -1));
+  lista[lista.length - 1].valor = arred(Math.max(props.total - outras, 0));
+};
+const aoDigitar = (i) => { if (i < partes.value.length - 1) completarUltima(); };
+watch(() => props.total, completarUltima);
 </script>
 
 <template>
@@ -115,7 +128,7 @@ const usarRestante = (parte) => {
         </div>
 
         <div class="grid grid-cols-12 gap-2 items-center">
-          <select v-model="p.forma" aria-label="Como recebeu"
+          <select v-model="p.forma" :aria-label="saida ? 'Como pagou' : 'Como recebeu'"
                   class="col-span-5 bg-white border border-slate-300 rounded-lg py-2 px-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow">
             <option v-for="f in FORMAS[p.conta]" :key="f" :value="f">{{ f }}</option>
           </select>
@@ -124,7 +137,7 @@ const usarRestante = (parte) => {
             <span class="absolute left-2.5 top-2.5 text-[11px] font-bold text-slate-400">R$</span>
             <input v-model="p.valor" type="number" step="0.01" min="0" inputmode="decimal"
                    aria-label="Valor da parte" data-campo="parte-valor"
-                   @focus="$event.target.select()" @keyup.enter="emit('enviar')"
+                   @focus="$event.target.select()" @keyup.enter="emit('enviar')" @input="aoDigitar(i)"
                    class="w-full border border-slate-300 rounded-lg py-2 pl-8 pr-2 text-sm font-bold text-slate-800 text-right outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           </div>
         </div>
@@ -149,7 +162,12 @@ const usarRestante = (parte) => {
 
     <p v-if="!compacto" class="text-xs text-slate-500 bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-2">
       <Link2 class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
-      <span>
+      <span v-if="saida">
+        Cada parte <strong class="text-indigo-900">sai da sua conta</strong> com o valor dela, tudo ligado
+        a este borderô — no Fluxo de Caixa as linhas aparecem juntas.<template v-if="autoCompletar"> Digite
+        quanto sai de uma conta: a última parte se completa sozinha com o que falta.</template>
+      </span>
+      <span v-else>
         Cada parte entra no caixa <strong class="text-indigo-900">na sua conta</strong>, com o valor
         dela, tudo vinculado a este mesmo pagamento — no Fluxo de Caixa as linhas aparecem agrupadas.
       </span>
