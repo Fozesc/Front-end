@@ -17,7 +17,7 @@ import { CONTAS } from '../utils/contasCaixa';
 import { REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import {
-  arredondar, calcularDias, calcularLinha, calcularComissao, divisorInverso, iofDasConfiguracoes,
+  arredondar, arredondarPagamento, calcularDias, calcularLinha, calcularComissao, divisorInverso, iofDasConfiguracoes,
   IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
 } from '../utils/calculoBordero';
 
@@ -216,18 +216,31 @@ const comissaoVale = ref(null);
 const parteDosJuros = computed(() =>
   `${comissao.value.parte.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
-const recalcularLinha = (item) => {
+const calcularItem = (item) => {
   item.dias = calcularDias(header.dataOperacao, item.vencimento, header.diasCompensacao);
   const { juros, iof, liquido } = calcularLinha({
     valor: item.valor, dias: item.dias, taxaMensal: header.taxaMensal,
     iofEnabled: header.iofEnabled, iofBase: header.iofBase, iofDiario: header.iofDiario
   });
-  item.juros = juros;
+  item.jurosCalculado = juros;
+  item.liquidoCalculado = liquido;
   item.iof = iof;
-  item.liquido = liquido;
 };
 
-const recalcularTudo = () => { itens.value.forEach(recalcularLinha); };
+// pagamento do cliente sem centavos: o liquido de cada cheque sobe para o proximo real e a
+// diferenca sai dos juros dele (regra em calculoBordero.arredondarPagamento)
+const arredondamento = ref({ falta: 0, mudados: 0 });
+const ajustarPagamento = () => {
+  const r = arredondarPagamento(itens.value.map(i => ({ juros: i.jurosCalculado ?? 0, liquido: i.liquidoCalculado ?? 0 })));
+  itens.value.forEach((item, k) => {
+    item.juros = r.linhas[k].juros;
+    item.liquido = r.linhas[k].liquido;
+  });
+  arredondamento.value = { falta: r.falta, mudados: r.mudados };
+};
+
+const recalcularLinha = (item) => { calcularItem(item); ajustarPagamento(); };
+const recalcularTudo = () => { itens.value.forEach(calcularItem); ajustarPagamento(); };
 watch(() => [header.dataOperacao, header.taxaMensal, header.diasCompensacao, header.iofEnabled, header.iofBase], () => recalcularTudo());
 
 const gerarParcelas = () => {
@@ -770,6 +783,9 @@ const processarSalvamento = async () => {
               <span class="text-[11px] font-medium text-slate-400 text-right leading-tight">Líquido<br>a pagar</span>
               <span class="text-xl font-semibold tracking-tight tabular-nums text-white">{{ formatCurrency(totais.liquido) }}</span>
             </div>
+            <p v-if="arredondamento.falta > 0" class="text-[11px] text-slate-500 leading-tight max-w-[170px]" data-campo="arredondamento">
+              Arredondado + {{ formatCurrency(arredondamento.falta) }}: {{ arredondamento.mudados === 1 ? 'o cheque subiu' : 'cada cheque subiu' }} para o próximo real, tirado dos juros
+            </p>
             <button @click="verificarLimiteESalvar" :disabled="loading" class="h-11 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-xs flex items-center gap-2 disabled:opacity-60">
               <Loader2 v-if="loading" class="w-4 h-4 animate-spin" /><Save v-else class="w-4 h-4" /> Efetivar
             </button>
