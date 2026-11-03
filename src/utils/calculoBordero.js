@@ -54,33 +54,11 @@ export const calcularLinha = ({ valor, dias, taxaMensal, iofEnabled, iofBase, io
   return { juros, iof, liquido: arredondar(valorFace - juros - iof) };
 };
 
-// Pagamento do cliente sem centavos (versao 2.11.1): o liquido de CADA cheque sobe para o
-// proximo real inteiro (1891,18 -> 1892,00) e o que falta sai dos juros do proprio cheque;
-// assim o total que o cliente recebe tambem fecha no real. Cheque sem juros para isso fica como
-// esta e, se o total ainda sobrar centavo, ele sai dos juros do ultimo cheque que der (o de prazo
-// mais longo; senao o de mais juros). Valor do cheque e IOF nao mudam: valor = juros + IOF +
-// liquido continua fechando. O servidor (operation_service.arredondar_pagamento) faz a mesma conta.
-const centavos = (v) => Math.round((Number(v) || 0) * 100);
-const faltaParaOReal = (c) => (Math.ceil(c / 100) * 100 - c) / 100;
-const subir = (l, falta) => ({ ...l, juros: arredondar(Number(l.juros) - falta), liquido: arredondar(Number(l.liquido) + falta) });
-
-export const arredondarPagamento = (linhas) => {
-  const novas = linhas.map((l) => {
-    const falta = faltaParaOReal(centavos(l.liquido));
-    return falta > 0 && Number(l.juros) >= falta ? subir(l, falta) : l;
-  });
-  const falta = faltaParaOReal(novas.reduce((t, l) => t + centavos(l.liquido), 0));
-  if (falta > 0 && novas.length) {
-    let i = novas.length - 1;
-    if (!(Number(novas[i].juros) >= falta)) {
-      i = novas.reduce((m, l, k) => (m < 0 || Number(l.juros) >= Number(novas[m].juros) ? k : m), -1);
-    }
-    if (Number(novas[i].juros) >= falta) novas[i] = subir(novas[i], falta);
-  }
-  const antes = linhas.reduce((t, l) => t + centavos(l.liquido), 0);
-  const depois = novas.reduce((t, l) => t + centavos(l.liquido), 0);
-  return { linhas: novas, falta: (depois - antes) / 100, mudados: novas.filter((l, k) => l !== linhas[k]).length };
-};
+// Parcela sem centavos (versao 2.11.3): no gerador de parcelas, o valor que o cliente vai pagar em
+// cada cheque/promissoria sobe para o proximo real (3712,47 -> 3713,00), para ele pagar sem
+// centavos. Juros, IOF e liquido continuam sendo a conta exata em cima desse valor. Feito em
+// centavos inteiros: 1995,00 continua 1995 (nao vira 1996 por erro de ponto flutuante).
+export const parcelaRedonda = (valor) => Math.ceil(Math.round((Number(valor) || 0) * 100) / 100 - 1e-9);
 
 // Comissao de alguem da empresa: `comissao` pontos dos `taxaMensal` pontos da taxa
 // (2 de 8% = 25% dos juros). Sai dos juros: nao muda juros, IOF nem liquido.

@@ -16,6 +16,10 @@ import transactionService from '../services/transactionService';
 
 const showModal = ref(false);
 const showConfigModal = ref(false);
+// capital social e saldos iniciais: so o Admin (o servidor tambem barra)
+let sessao = {};
+try { sessao = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { sessao = {}; }
+const ehAdmin = sessao.role === 'Admin';
 const loading = ref(true);
 
 const lancamentoEmEdicao = ref(null);
@@ -274,7 +278,7 @@ const linhas = computed(() => {
         <router-link to="/relatorio-caixa" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
           <FileBarChart class="w-4 h-4 text-slate-500" /> Relatório
         </router-link>
-        <button @click="showConfigModal = true" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
+        <button v-if="ehAdmin" @click="showConfigModal = true" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors">
           <Settings class="w-4 h-4 text-slate-500" /> Capital social
         </button>
         <button @click="abrirModalNovo" class="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs ring-1 ring-inset ring-white/10 flex items-center transition-all active:scale-[0.98]">

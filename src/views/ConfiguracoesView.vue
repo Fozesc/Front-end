@@ -100,7 +100,7 @@ const salvarConfig = async () => {
     await api.put('/settings/', config.value);
     showAlert('Sucesso!', 'Preferências salvas com sucesso!', 'success');
   } catch (error) {
-    showAlert('Erro', 'Erro ao salvar configurações.', 'error');
+    showAlert('Erro', error.response?.data?.error || 'Erro ao salvar configurações.', 'error');
   } finally {
     saving.value = false;
   }
@@ -264,7 +264,10 @@ onMounted(() => {
     <ConfigBackup v-if="aba === 'backups'" />
 
     <div v-show="aba === 'geral'">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <p v-if="!ehAdmin" class="mb-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+      Só o administrador altera os dados da empresa e as taxas. Aqui você vê os valores em uso.
+    </p>
+    <fieldset :disabled="!ehAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 disabled:opacity-90">
       
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200/80 h-fit">
         <div class="flex items-center gap-3 mb-5 text-sm text-slate-900 font-semibold border-b border-slate-100 pb-4">
@@ -314,12 +317,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <button @click="salvarConfig" :disabled="saving" class="w-full bg-indigo-600 text-white font-semibold text-sm py-2.5 rounded-lg shadow-xs ring-1 ring-inset ring-white/10 hover:bg-indigo-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2">
+        <button v-if="ehAdmin" @click="salvarConfig" :disabled="saving" class="w-full bg-indigo-600 text-white font-semibold text-sm py-2.5 rounded-lg shadow-xs ring-1 ring-inset ring-white/10 hover:bg-indigo-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2">
           <Save v-if="!saving" class="w-4 h-4" />
           {{ saving ? 'Salvando...' : 'Salvar preferências' }}
         </button>
       </div>
-    </div>
+    </fieldset>
 
     <div v-if="ehAdmin" class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">

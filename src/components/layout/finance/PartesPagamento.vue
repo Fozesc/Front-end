@@ -4,7 +4,7 @@
 // ultima parte se ajusta sozinha com o que falta quando outra muda ou quando o total muda.
 import { computed, onMounted, watch } from 'vue';
 import { Plus, Trash2, CheckCircle2, Divide, Link2 } from 'lucide-vue-next';
-import { CONTAS, FORMAS, ESTILO, arred, somaPartes } from '../../../utils/contasCaixa';
+import { CONTAS, FORMAS, ESTILO, arred, somaPartes, valorDaUltimaParte } from '../../../utils/contasCaixa';
 
 const props = defineProps({
   modelValue: { type: Array, required: true },
@@ -69,8 +69,7 @@ const usarRestante = (parte) => {
 const completarUltima = () => {
   const lista = partes.value;
   if (!props.autoCompletar || lista.length < 2) return;
-  const outras = somaPartes(lista.slice(0, -1));
-  lista[lista.length - 1].valor = arred(Math.max(props.total - outras, 0));
+  lista[lista.length - 1].valor = valorDaUltimaParte(lista, props.total);
 };
 const aoDigitar = (i) => { if (i < partes.value.length - 1) completarUltima(); };
 watch(() => props.total, completarUltima);

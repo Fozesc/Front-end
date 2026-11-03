@@ -1,4 +1,5 @@
 <script setup>
+import { lerAvisoLogin } from '../utils/sessao';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Lock, User, ArrowRight, AlertTriangle } from 'lucide-vue-next';
@@ -9,6 +10,8 @@ const email = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
+// por que voltou para o login (venceu, foi encerrado...)
+const aviso = ref(lerAvisoLogin());
 
 const handleLogin = async () => {
   loading.value = true;
@@ -90,6 +93,7 @@ const handleLogin = async () => {
             </div>
           </div>
 
+          <div v-if="aviso && !error" class="text-amber-800 text-sm font-medium bg-amber-50 border border-amber-200 p-3 rounded-lg" data-campo="aviso-login">{{ aviso }}</div>
           <div v-if="error" class="text-red-700 text-sm font-medium bg-red-50 border border-red-200 p-3 rounded-lg flex items-center gap-2">
             <AlertTriangle class="w-4 h-4" /> {{ error }}
           </div>

@@ -1,4 +1,5 @@
 <script setup>
+import { hojeLocal, somarDiasLocal } from '../utils/datas';
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
@@ -18,7 +19,7 @@ import PartesPagamento from '../components/layout/finance/PartesPagamento.vue';
 import { REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import {
-  arredondar, arredondarPagamento, calcularDias, calcularLinha, calcularComissao, divisorInverso, iofDasConfiguracoes,
+  parcelaRedonda, calcularDias, calcularLinha, calcularComissao, divisorInverso, iofDasConfiguracoes,
   IOF_BASE_PADRAO, IOF_DIARIO_PADRAO, DIAS_COMPENSACAO_PADRAO
 } from '../utils/calculoBordero';
 
@@ -59,7 +60,7 @@ const header = reactive({
   clienteDivida: 0,      
   clienteReputacao: null,
   emitenteNome: '',
-  dataOperacao: new Date().toISOString().split('T')[0],
+  dataOperacao: hojeLocal(),
   taxaMensal: 4.00,
   diasCompensacao: DIAS_COMPENSACAO_PADRAO,
   comissao: 0,
@@ -141,14 +142,6 @@ const fetchSettings = async () => {
   }
 };
 
-onMounted(async () => {
-  const hoje = new Date();
-  hoje.setDate(hoje.getDate() + 30);
-  gerador.primeiroVencimento = hoje.toISOString().split('T')[0];
-  
-  await fetchSettings(); 
-  adicionarLinha(); 
-});
 
 const fetchNextId = async () => {
   try {
@@ -227,31 +220,18 @@ const comissaoVale = ref(null);
 const parteDosJuros = computed(() =>
   `${comissao.value.parte.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
-const calcularItem = (item) => {
+const recalcularLinha = (item) => {
   item.dias = calcularDias(header.dataOperacao, item.vencimento, header.diasCompensacao);
   const { juros, iof, liquido } = calcularLinha({
     valor: item.valor, dias: item.dias, taxaMensal: header.taxaMensal,
     iofEnabled: header.iofEnabled, iofBase: header.iofBase, iofDiario: header.iofDiario
   });
-  item.jurosCalculado = juros;
-  item.liquidoCalculado = liquido;
+  item.juros = juros;
   item.iof = iof;
+  item.liquido = liquido;
 };
 
-// pagamento do cliente sem centavos: o liquido de cada cheque sobe para o proximo real e a
-// diferenca sai dos juros dele (regra em calculoBordero.arredondarPagamento)
-const arredondamento = ref({ falta: 0, mudados: 0 });
-const ajustarPagamento = () => {
-  const r = arredondarPagamento(itens.value.map(i => ({ juros: i.jurosCalculado ?? 0, liquido: i.liquidoCalculado ?? 0 })));
-  itens.value.forEach((item, k) => {
-    item.juros = r.linhas[k].juros;
-    item.liquido = r.linhas[k].liquido;
-  });
-  arredondamento.value = { falta: r.falta, mudados: r.mudados };
-};
-
-const recalcularLinha = (item) => { calcularItem(item); ajustarPagamento(); };
-const recalcularTudo = () => { itens.value.forEach(calcularItem); ajustarPagamento(); };
+const recalcularTudo = () => { itens.value.forEach(recalcularLinha); };
 watch(() => [header.dataOperacao, header.taxaMensal, header.diasCompensacao, header.iofEnabled, header.iofBase], () => recalcularTudo());
 
 const gerarParcelas = () => {
@@ -311,9 +291,10 @@ const gerarParcelas = () => {
       + 'teria juros e IOF maiores que o próprio valor. Use menos parcelas ou um prazo menor.', 'error');
   }
 
-  const valorParcelaBruta = gerador.modo === 'valor_mao'
-    ? arredondar(gerador.valorAlvo / divisores.reduce((soma, d) => soma + d, 0))
-    : arredondar(gerador.valorAlvo / gerador.qtdParcelas);
+  // a parcela que o cliente paga sai sem centavos: sobe para o proximo real (versao 2.11.3)
+  const valorParcelaBruta = parcelaRedonda(gerador.modo === 'valor_mao'
+    ? gerador.valorAlvo / divisores.reduce((soma, d) => soma + d, 0)
+    : gerador.valorAlvo / gerador.qtdParcelas);
 
   avisoDiaUtil.value = ajustes.length
     ? { ajustado: ajustarDiaUtil.value, itens: ajustes }
@@ -363,6 +344,9 @@ const exportarBordero = async () => {
 
 const novoBordero = () => {
   modalState.visible = false;
+  limparRascunho();
+  rascunhoRecuperado.value = false;
+  chaveCliente.value++;
   partesSaida.value = [{ conta: 'Dinheiro', forma: 'Dinheiro', valor: 0 }, { conta: 'BB', forma: 'PIX', valor: 0 }];
   itens.value = [];
   adicionarLinha();
@@ -435,6 +419,8 @@ const processarSalvamento = async () => {
       }))
     };
     const resposta = await operationService.create(payload);
+    limparRascunho();
+    rascunhoRecuperado.value = false;
 
     lastOperationId.value = resposta.id;
     // a tela so limpa quando o aviso fecha: tem navegador (Safari) que monta a impressao
@@ -450,6 +436,44 @@ const processarSalvamento = async () => {
     loading.value = false;
   }
 };
+
+// Rascunho (versao 2.11.3): o borderô que esta sendo montado fica guardado nesta aba. Se o login
+// vencer no meio (o Efetivar volta para o login) ou a pagina recarregar, ao voltar ele reaparece.
+const CHAVE_RASCUNHO = 'fozesc_rascunho_bordero';
+const rascunhoRecuperado = ref(false);
+const chaveCliente = ref(0);
+let timerRascunho = null;
+const limparRascunho = () => { try { sessionStorage.removeItem(CHAVE_RASCUNHO); } catch { /* aba anonima */ } };
+watch([() => header, itens, partesSaida], () => {
+  clearTimeout(timerRascunho);
+  timerRascunho = setTimeout(() => {
+    const temAlgo = header.clienteId || itens.value.some(i => Number(i.valor) > 0);
+    try {
+      if (temAlgo) sessionStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ header, itens: itens.value, partes: partesSaida.value }));
+    } catch { /* cheio ou aba anonima: so nao guarda */ }
+  }, 400);
+}, { deep: true });
+
+const recuperarRascunho = () => {
+  let r = null;
+  try { r = JSON.parse(sessionStorage.getItem(CHAVE_RASCUNHO) || 'null'); } catch { r = null; }
+  if (!r?.itens?.length) return;
+  Object.assign(header, r.header);
+  itens.value = r.itens;
+  if (Array.isArray(r.partes) && r.partes.length) partesSaida.value = r.partes;
+  chaveCliente.value++;
+  recalcularTudo();
+  rascunhoRecuperado.value = true;
+};
+const descartarRascunho = () => { limparRascunho(); rascunhoRecuperado.value = false; novoBordero(); };
+
+onMounted(async () => {
+  gerador.primeiroVencimento = somarDiasLocal(30);
+  
+  await fetchSettings(); 
+  adicionarLinha(); 
+  recuperarRascunho();
+});
 </script>
 
 <template>
@@ -514,6 +538,12 @@ const processarSalvamento = async () => {
         </div>
       </div>
 
+      <div v-if="rascunhoRecuperado" class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-center gap-3 text-sm" data-campo="rascunho">
+        <span class="flex-1 text-indigo-900">Recuperei o borderô que estava sendo montado (o login tinha vencido ou a página recarregou). Confira os dados antes de efetivar.</span>
+        <button type="button" @click="rascunhoRecuperado = false" class="h-8 px-3 rounded-md bg-white border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100">Continuar</button>
+        <button type="button" @click="descartarRascunho" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50">Descartar</button>
+      </div>
+
       <section class="bg-white border border-slate-200 rounded-lg shadow-xs relative z-30">
         <header class="px-5 py-3 border-b border-slate-200">
           <h2 class="text-sm font-semibold text-slate-900">Dados da operação</h2>
@@ -522,7 +552,7 @@ const processarSalvamento = async () => {
         <div class="p-5 space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
             <div class="relative xl:col-span-5">
-              <ClientSelect v-model="header.clienteId" @select="selecionarCliente" />
+              <ClientSelect :key="chaveCliente" v-model="header.clienteId" :initial-name="header.clienteNome" @select="selecionarCliente" />
               <div v-if="header.clienteId && header.clienteLimite > 0" class="absolute right-0 top-0 text-xs font-medium text-slate-500">
                 Disponível: <span class="tabular-nums" :class="header.clienteLimite - header.clienteDivida < 0 ? 'text-red-600' : 'text-emerald-600'">{{ formatCurrency(header.clienteLimite - header.clienteDivida) }}</span>
               </div>
@@ -812,9 +842,6 @@ const processarSalvamento = async () => {
               <span class="text-[11px] font-medium text-slate-400 text-right leading-tight">Líquido<br>a pagar</span>
               <span class="text-xl font-semibold tracking-tight tabular-nums text-white">{{ formatCurrency(totais.liquido) }}</span>
             </div>
-            <p v-if="arredondamento.falta > 0" class="text-[11px] text-slate-500 leading-tight max-w-[170px]" data-campo="arredondamento">
-              Arredondado + {{ formatCurrency(arredondamento.falta) }}: {{ arredondamento.mudados === 1 ? 'o cheque subiu' : 'cada cheque subiu' }} para o próximo real, tirado dos juros
-            </p>
             <button @click="verificarLimiteESalvar" :disabled="loading" class="h-11 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-xs flex items-center gap-2 disabled:opacity-60">
               <Loader2 v-if="loading" class="w-4 h-4 animate-spin" /><Save v-else class="w-4 h-4" /> Efetivar
             </button>

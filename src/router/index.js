@@ -17,6 +17,7 @@ import CalendarioView from '../views/CalendarioView.vue'
 import FolhasView from '../views/FolhasView.vue'
 import RecorrentesView from '../views/RecorrentesView.vue'
 import { gerarPendentes } from '../services/recorrenteService'
+import { lerSessao, sessaoVencida, encerrarSessao } from '../utils/sessao'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -117,7 +118,11 @@ const router = createRouter({
  * GUARDA GLOBAL DE AUTENTICAÇÃO
  */
 router.beforeEach(async (to, from, next) => {
-  // 1. Buscamos a chave correta: 'user'
+  // 1. Buscamos a chave correta: 'user'. Login vencido (computador aberto de um dia para o
+  // outro) sai ja, antes de a pessoa digitar algo na tela.
+  if (localStorage.getItem('user') && sessaoVencida(lerSessao())) {
+    encerrarSessao('Seu login venceu. Entre de novo.');
+  }
   const userSession = localStorage.getItem('user');
 
   // 2. Se a rota exige auth E não tem usuário logado => Manda pro Login

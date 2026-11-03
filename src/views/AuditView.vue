@@ -1,4 +1,5 @@
 <script setup>
+import { dataLocal } from '../utils/datas';
 import { ref, onMounted, reactive, watch, computed } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
@@ -94,7 +95,7 @@ const resetFilters = () => {
   fetchLogs();
 };
 
-const iso = (d) => d.toISOString().split('T')[0];
+const iso = dataLocal;
 const periodoRapido = (dias) => {
   const hoje = new Date();
   const inicio = new Date();

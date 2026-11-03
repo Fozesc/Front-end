@@ -1,4 +1,5 @@
 <script setup>
+import { hojeLocal } from '../../utils/datas';
 import { reactive, onMounted, computed } from 'vue';
 import { avisar } from '../../utils/avisos';
 import { X, Save, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Wallet, Building, Banknote } from 'lucide-vue-next';
@@ -14,11 +15,12 @@ const form = reactive({
   tipo: 'entrada',
   descricao: '',
   valor: '',
-  data: new Date().toISOString().split('T')[0],
+  data: hojeLocal(),
   origem: 'Dinheiro',
   category: 'Geral',
   conta_entrada: 'Dinheiro',
-  conta_saida: 'BB'
+  conta_saida: 'BB',
+  senha: ''
 });
 
 const CONTAS = [
@@ -29,6 +31,13 @@ const CONTAS = [
 
 const isEdicao = computed(() => !!props.lancamento);
 const isTrocaExistente = computed(() => !!props.lancamento?.troca_id);
+// editar valor, entrada/saida, conta ou data mexe no saldo: pede a senha (o servidor confere)
+const mexeNoDinheiro = computed(() => {
+  const l = props.lancamento;
+  if (!l) return false;
+  return Math.abs(Math.abs(Number(form.valor) || 0) - Math.abs(Number(l.valor) || 0)) > 0.005
+    || form.tipo !== l.tipo || form.data !== l.data || form.origem !== (l.origem || 'Dinheiro');
+});
 // linha de borderô, titulo ou vale: valor e tipo so mudam pela tela de origem (o backend tambem recusa)
 const vinculado = computed(() => {
   const l = props.lancamento;
@@ -66,6 +75,7 @@ const salvar = () => {
     });
   }
   if (!form.descricao || !form.valor) return avisar('Preencha a descrição e o valor do lançamento.');
+  if (mexeNoDinheiro.value && !form.senha) return avisar('Digite sua senha para mudar o valor, a conta ou a data.');
   
 
   let valorFinal = Math.abs(parseFloat(form.valor));
@@ -155,6 +165,13 @@ const salvar = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      <div v-if="isEdicao && mexeNoDinheiro && form.tipo !== 'troca'" class="px-6 pb-4 -mt-1" data-campo="senha-edicao">
+        <label for="edicao-senha" class="block text-[13px] font-medium text-slate-700 mb-1.5">Sua senha (muda o saldo)</label>
+        <input id="edicao-senha" v-model="form.senha" type="password" autocomplete="current-password" placeholder="Senha do seu login"
+               @keyup.enter="salvar"
+               class="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs text-sm" />
       </div>
 
       <div class="bg-slate-50/70 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">

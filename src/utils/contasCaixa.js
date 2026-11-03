@@ -43,4 +43,7 @@ export const somaPartes = (partes) => arred(partes.reduce((t, p) => t + (Number(
 export const partesFecham = (partes, total) =>
   partes.length > 0 && partes.every(p => (Number(p.valor) || 0) > 0) &&
   Math.abs(arred(total) - somaPartes(partes)) < 0.005;
+// o valor que a ULTIMA parte precisa ter para a soma fechar com o total (nunca negativo)
+export const valorDaUltimaParte = (partes, total) =>
+  arred(Math.max((Number(total) || 0) - somaPartes(partes.slice(0, -1)), 0));
 export const partesParaEnviar = (partes) => partes.map(p => ({ conta: p.conta, forma: p.forma, valor: arred(p.valor) }));

@@ -2,7 +2,7 @@
 // Rode:  node test_calculo_bordero.mjs
 import assert from 'node:assert/strict';
 import {
-  arredondar, arredondarPagamento, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao, calcularImposto,
+  arredondar, parcelaRedonda, calcularDias, calcularLinha, divisorInverso, calcularProrrogacao, calcularImposto,
   calcularComissao
 } from './src/utils/calculoBordero.js';
 
@@ -123,38 +123,27 @@ for (const [comissao, taxaMensal] of [[0, 8], ['', 8], [null, 8], [2, 0], [-1, 8
   assert.deepEqual(calcularComissao({ juros: 855.56, comissao, taxaMensal }), { valor: 0, parte: 0 }, `${comissao}/${taxaMensal}`);
 }
 
-// pagamento do cliente sem centavos (2.11.1): cada cheque sobe para o proximo real, tirado dos juros dele
-const pg = arredondarPagamento([{ juros: 90.68, iof: 13.14, liquido: 1891.18 }, { juros: 168.44, iof: 17.72, liquido: 1808.84 }]);
-assert.deepEqual(pg.linhas, [{ juros: 89.86, iof: 13.14, liquido: 1892 }, { juros: 168.28, iof: 17.72, liquido: 1809 }]);
-assert.deepEqual([pg.falta, pg.mudados], [0.98, 2]);
-assert.deepEqual(arredondarPagamento([{ juros: 80, liquido: 1110.35 }]).linhas, [{ juros: 79.35, liquido: 1111 }], '1110,35 -> 1111');
-assert.equal(arredondarPagamento([{ juros: 9, liquido: 1111 }]).falta, 0, 'ja redondo fica igual');
-const semJuros = arredondarPagamento([{ juros: 0, liquido: 100.5 }, { juros: 30, liquido: 200 }]);
-assert.deepEqual(semJuros.linhas.map(l => l.liquido), [100.5, 200.5], 'cheque sem juros fica; o total fecha no outro');
-assert.equal(arredondarPagamento([{ juros: 0, liquido: 100.5 }]).falta, 0, 'sem juros para tirar: nao arredonda');
-assert.equal(arredondarPagamento([]).falta, 0);
-// sorteados: cada cheque e o total fecham no real, valor = juros + IOF + liquido, cada um sobe menos de 1 real
+// parcela sem centavos (2.11.3): no gerador, o valor que o cliente paga sobe para o proximo real
+assert.deepEqual([3712.47, 1995, 1995.0000000001, 3333.333333, 0.01, 1110.35].map(parcelaRedonda),
+  [3713, 1995, 1995, 3334, 1, 1111], 'sobe para o proximo real; ja redondo fica igual (sem erro de ponto flutuante)');
+// gerador "Pelo liquido" com a parcela redonda: o cliente recebe pelo menos o pedido, e a conta de
+// cada cheque continua exata (valor = juros + IOF + liquido, juros pela formula de sempre)
 let semente = 7;
 const sorteio = () => (semente = (semente * 16807) % 2147483647) / 2147483647;
-for (let n = 0; n < 5000; n++) {
-  const taxaMensal = 1 + Math.round(sorteio() * 900) / 100;
-  const linhas = Array.from({ length: 1 + Math.floor(sorteio() * 12) }, () => {
-    const valor = Math.round(sorteio() * 2000000) / 100 + 50;
-    const dias = 3 + Math.floor(sorteio() * 360);
-    return { valor, ...calcularLinha({ valor, dias, taxaMensal, ...IOF }) };
-  }).filter(l => l.liquido > 0 && l.juros >= 1);
-  if (!linhas.length) continue;
-  const r = arredondarPagamento(linhas);
-  const total = r.linhas.reduce((t, l) => t + Math.round(l.liquido * 100), 0);
-  assert.equal(total % 100, 0, 'total redondo');
-  r.linhas.forEach((l, k) => {
-    assert.equal(Math.round(l.liquido * 100) % 100, 0, `parcela redonda: ${l.liquido}`);
-    assert.ok(l.liquido >= linhas[k].liquido && l.liquido - linhas[k].liquido < 1, 'cada parcela sobe menos de 1 real');
-    assert.equal(arredondar(l.juros + l.iof + l.liquido), arredondar(linhas[k].valor), 'valor = juros + IOF + liquido');
-    assert.equal(l.iof, linhas[k].iof, 'IOF nao muda');
-  });
+for (let n = 0; n < 3000; n++) {
+  const taxaMensal = 1 + Math.round(sorteio() * 600) / 100;
+  const alvo = Math.round(sorteio() * 5000000) / 100 + 100;
+  const prazos = Array.from({ length: 1 + Math.floor(sorteio() * 12) }, (_, i) => 30 * (i + 1));
+  const div = prazos.map(dias => divisorInverso({ dias, taxaMensal, ...IOF }));
+  if (div.some(d => !(d > 0))) continue;
+  const parcela = parcelaRedonda(alvo / div.reduce((t, d) => t + d, 0));
+  assert.equal(parcela, Math.trunc(parcela), 'parcela inteira');
+  const linhas = prazos.map(dias => calcularLinha({ valor: parcela, dias, taxaMensal, ...IOF }));
+  const liquido = linhas.reduce((t, l) => t + l.liquido, 0);
+  assert.ok(liquido >= alvo - 0.01 * prazos.length, `cliente recebe pelo menos o pedido: ${alvo} -> ${liquido}`);
+  linhas.forEach(l => assert.equal(arredondar(l.juros + l.iof + l.liquido), parcela, 'conta exata'));
 }
 
-console.log('OK: pagamento do cliente sem centavos (5.000 borderôs sorteados), juros da prorrogação pelo Borderô de Líquido (Inverso) sobre o saldo, padrão = paga os juros ' +
+console.log('OK: parcela sem centavos no gerador (3.000 sorteados), juros da prorrogação pelo Borderô de Líquido (Inverso) sobre o saldo, padrão = paga os juros ' +
             '(valor devido igual), pagamento quita juros antes de abater, menos que os juros soma no saldo, ' +
             'sem prorrogar, ajuste manual, taxa/IOF, prazo inválido, imposto do Receber e comissão (pontos da taxa).');

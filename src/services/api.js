@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { encerrarSessao } from '../utils/sessao';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -29,8 +30,9 @@ api.interceptors.request.use((config) => {
 
 
 api.interceptors.response.use(response => response, error => {
-  if (error.response && error.response.status === 401) {
-    localStorage.removeItem('user');
+  // 401 de qualquer pedido que nao seja o proprio login: o login venceu ou o usuario saiu
+  if (error.response && error.response.status === 401 && !String(error.config?.url || '').includes('/auth/login')) {
+    encerrarSessao('Seu login venceu ou foi encerrado. Entre de novo.');
     window.location.href = '/login';
   }
   return Promise.reject(error);

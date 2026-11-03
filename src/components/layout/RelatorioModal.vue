@@ -1,4 +1,5 @@
 <script setup>
+import { hojeLocal, somarDiasLocal } from '../../utils/datas';
 import { ref, nextTick } from 'vue';
 import { X, FileText, Printer, Loader2, AlertCircle, ArrowLeft } from 'lucide-vue-next';
 import api from '../../services/api';
@@ -18,8 +19,8 @@ const relatorio = ref(null);
 
 const filtro = ref({
   tipo: 'geral',
-  inicio: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-  fim: new Date().toISOString().split('T')[0]
+  inicio: somarDiasLocal(-30),
+  fim: hojeLocal()
 });
 
 const moeda = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
