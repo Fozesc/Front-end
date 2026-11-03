@@ -36,3 +36,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# contratos de clientes (dados pessoais): nunca vao para o GitHub
+teste-contratos/
+Contrato*.pdf
+contratos/*.pdf

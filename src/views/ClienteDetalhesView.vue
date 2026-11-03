@@ -14,6 +14,7 @@ import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vu
 import api from '../services/api';
 import { baixarRelatorioClientePdf } from '../utils/relatorioClientePdf';
 import { baixarFichaClientePdf } from '../utils/fichaClientePdf';
+import { baixarBorderoPdf, baixarPromissoriasDoBordero, temPromissorias } from '../utils/documentosBordero';
 import { LINHAS_REPUTACAO, REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 
@@ -57,6 +58,20 @@ const cliente = ref({
 });
 
 const operacoesDoCliente = ref([]); 
+// borderô e promissorias de novo, a qualquer hora (mesmo PDF de quando foi efetivado)
+const baixandoDoc = ref('');
+const baixarDoc = async (op, qual) => {
+  if (baixandoDoc.value) return;
+  baixandoDoc.value = `${op.id}-${qual}`;
+  try {
+    if (qual === 'bordero') await baixarBorderoPdf(op.id);
+    else await baixarPromissoriasDoBordero(op.id);
+  } catch (e) {
+    avisarErro(e, `Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}.`);
+  } finally {
+    baixandoDoc.value = '';
+  }
+};
 const reputacao = ref(null);
 
 
@@ -423,7 +438,7 @@ const exportarFicha = async () => {
                 <div class="text-xs text-slate-500 flex gap-2">
                   <span class="flex items-center gap-1"><Clock class="w-3 h-3" /> {{ formatDate(op.data) }}</span>
                   <span>•</span>
-                  <span>{{ op.cheques ? op.cheques.length : 0 }} Cheques</span>
+                  <span>{{ op.cheques ? op.cheques.length : 0 }} {{ temPromissorias(op.cheques) ? 'Promissórias' : 'Cheques' }}</span>
                 </div>
               </div>
             </div>
@@ -451,6 +466,16 @@ const exportarFicha = async () => {
           </div>
 
           <div v-if="expandedOps.includes(op.id)" class="border-t border-slate-100 bg-slate-50/60 p-4 animate-fade-in-down">
+            <div class="flex flex-wrap justify-end gap-2 mb-3" data-campo="documentos-bordero">
+              <button @click="baixarDoc(op, 'bordero')" :disabled="!!baixandoDoc" data-campo="ficha-baixar-bordero"
+                      class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
+                <Loader2 v-if="baixandoDoc === `${op.id}-bordero`" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5 text-slate-500" /> Baixar borderô
+              </button>
+              <button v-if="temPromissorias(op.cheques)" @click="baixarDoc(op, 'promissorias')" :disabled="!!baixandoDoc" data-campo="ficha-baixar-promissorias"
+                      class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
+                <Loader2 v-if="baixandoDoc === `${op.id}-promissorias`" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5 text-slate-500" /> Baixar promissórias
+              </button>
+            </div>
             <table class="w-full text-left text-sm bg-white rounded-lg shadow-xs overflow-visible border border-slate-200">
               <thead class="bg-slate-50 text-slate-500 text-xs font-medium border-b border-slate-200">
                 <tr>

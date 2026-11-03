@@ -5,9 +5,11 @@ import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
   Plus, Trash2, Save, ArrowLeft, Printer, Calculator,
-  AlertTriangle, CheckCircle, Loader2, Building2, CalendarClock, X, Split
+  AlertTriangle, CheckCircle, Loader2, Building2, CalendarClock, X, Split, FileText
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
+import { avisar } from '../utils/avisos';
+import { baixarBorderoPdf, baixarPromissoriasDoBordero } from '../utils/documentosBordero';
 import operationService from '../services/operationService';
 import checkService from '../services/checkService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
@@ -50,6 +52,21 @@ const showPopup = (title, message, type = 'success') => {
 };
 
 const itens = ref([]);
+const empresa = ref({});
+
+const TIPOS_TITULO = [{ id: 'CHEQUE', nome: 'Cheques' }, { id: 'PROMISSORIA', nome: 'Promissórias' }];
+const ehPromissoria = computed(() => header.tipo === 'PROMISSORIA');
+const nome = computed(() => (ehPromissoria.value ? { um: 'promissória', varios: 'promissórias' } : { um: 'cheque', varios: 'cheques' }));
+// nome, CNPJ e endereco da empresa escolhida no topo (Ajustes > Empresas): vao no borderô impresso e na promissoria
+const empresaAtual = computed(() => {
+  const e = empresa.value;
+  return selectedCompany.value === 'PQ'
+    ? { nome: e.pqNome || 'PQ', cnpj: e.pqCnpj, endereco: e.pqEndereco }
+    : { nome: e.nomeEmpresa || 'Fozesc', cnpj: e.cnpj, endereco: e.endereco };
+});
+// na promissoria quem assina e' o proprio cliente
+const emitenteFinal = () => (ehPromissoria.value ? header.clienteNome : header.emitenteNome);
+const numeroTitulo = (item, i) => item.num_doc || (ehPromissoria.value ? `${i + 1}/${itens.value.length}` : '');
 
 const header = reactive({
   clienteId: null,
@@ -59,7 +76,11 @@ const header = reactive({
   clienteLimite: 0,      
   clienteDivida: 0,      
   clienteReputacao: null,
+  clienteEndereco: '',
   emitenteNome: '',
+  tipo: 'CHEQUE',
+  avalistaNome: '',
+  avalistaDocumento: '',
   dataOperacao: hojeLocal(),
   taxaMensal: 4.00,
   diasCompensacao: DIAS_COMPENSACAO_PADRAO,
@@ -133,6 +154,7 @@ const fetchSettings = async () => {
   try {
     const { data } = await api.get('/settings/');
     if (data) {
+      empresa.value = data;
       const { iofBase, iofDiario } = iofDasConfiguracoes(data);
       header.iofBase = iofBase;
       header.iofDiario = iofDiario;
@@ -161,7 +183,7 @@ const fetchNextId = async () => {
 const selecionarCliente = (cliente) => {
   if (!cliente) {
     header.clienteId = null; header.clienteNome = '';
-    header.clienteDocumento = ''; header.clienteTelefone = '';
+    header.clienteDocumento = ''; header.clienteTelefone = ''; header.clienteEndereco = '';
     header.clienteLimite = 0; header.clienteDivida = 0; header.clienteReputacao = null;
     return;
   }
@@ -169,6 +191,8 @@ const selecionarCliente = (cliente) => {
   header.clienteNome = cliente.name;
   header.clienteDocumento = cliente.document || '';
   header.clienteTelefone = cliente.phone || '';
+  header.clienteEndereco = [cliente.address, cliente.neighborhood, [cliente.city, cliente.state].filter(Boolean).join('/'),
+    cliente.zip_code && `CEP ${cliente.zip_code}`].filter(Boolean).join(' - ');
   if (cliente.standard_rate) header.taxaMensal = cliente.standard_rate;
   header.clienteLimite = cliente.credit_limit || 0;
   header.clienteDivida = cliente.valor_em_aberto || 0; 
@@ -342,6 +366,23 @@ const exportarBordero = async () => {
   window.print();
 };
 
+// downloads do borderô efetivado: so quando a pessoa clica (antes saia sozinho e, fechando o aviso sem
+// querer, perdia). Os dados vem do que foi gravado - os mesmos da ficha do cliente e do titulo.
+const baixando = ref('');
+const baixar = async (qual) => {
+  if (baixando.value) return;
+  baixando.value = qual;
+  try {
+    if (qual === 'bordero') await baixarBorderoPdf(lastOperationId.value);
+    else await baixarPromissoriasDoBordero(lastOperationId.value);
+  } catch (e) {
+    console.error(e);
+    avisar(`Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}. Tente de novo.`);
+  } finally {
+    baixando.value = '';
+  }
+};
+
 const novoBordero = () => {
   modalState.visible = false;
   limparRascunho();
@@ -352,10 +393,11 @@ const novoBordero = () => {
   adicionarLinha();
   gerador.valorAlvo = 0;
   header.clienteId = null; header.clienteNome = '';
-  header.clienteDocumento = ''; header.clienteTelefone = '';
+  header.clienteDocumento = ''; header.clienteTelefone = ''; header.clienteEndereco = '';
   header.clienteLimite = 0; header.clienteDivida = 0; header.clienteReputacao = null;
   riscoEmitente.value = null;
   header.comissao = 0;
+  header.avalistaNome = ''; header.avalistaDocumento = '';
   abaterVale.value = false;
   valeId.value = null;
   lastOperationId.value = null;
@@ -365,7 +407,7 @@ const novoBordero = () => {
 const verificarLimiteESalvar = () => {
   if (loading.value) return;
   if (!header.clienteId) return showPopup('Atenção', 'Selecione um cliente válido.', 'error');
-  if (!header.emitenteNome) return showPopup('Atenção', 'Informe o emitente.', 'error');
+  if (!ehPromissoria.value && !header.emitenteNome) return showPopup('Atenção', 'Informe o emitente.', 'error');
   if (itens.value.length === 0 || totais.value.bruto <= 0) return showPopup('Atenção', 'Borderô vazio.', 'error');
   if (dividida.value && !partesFecham(partesSaida.value, totais.value.liquido)) {
     return showPopup('Atenção', `A saída dividida tem que somar o líquido do borderô (${formatCurrency(totais.value.liquido)}). `
@@ -373,7 +415,7 @@ const verificarLimiteESalvar = () => {
   }
   if (itens.value.some(i => !i.vencimento)) return showPopup('Erro', 'Datas inválidas.', 'error');
   const zerado = itens.value.findIndex(i => !(Number(i.valor) > 0) || !(Number(i.liquido) > 0));
-  if (zerado >= 0) return showPopup('Atenção', `O cheque ${zerado + 1} está com valor ou líquido zerado/negativo (juros maiores que o cheque). Corrija antes de efetivar.`, 'error');
+  if (zerado >= 0) return showPopup('Atenção', `${ehPromissoria.value ? 'A promissória' : 'O cheque'} ${zerado + 1} está com valor ou líquido zerado/negativo (juros maiores que o valor). Corrija antes de efetivar.`, 'error');
   if (comissaoInvalida.value) return showPopup('Atenção', `A comissão tem que ficar entre 0 e a taxa (${header.taxaMensal}%).`, 'error');
   if (abaterVale.value && !(comissao.value.valor > 0)) return showPopup('Atenção', 'Preencha a comissão para descontar do vale.', 'error');
   if (abaterVale.value && !valeId.value) return showPopup('Atenção', 'Escolha o vale que vai receber a comissão.', 'error');
@@ -410,12 +452,14 @@ const processarSalvamento = async () => {
       ...(abaterVale.value && valeId.value ? { vale_id: valeId.value } : {}),
       // o servidor grava exatamente estes centavos (depois de conferir com a mesma conta)
       iof_enabled: header.iofEnabled,
+      empresa: selectedCompany.value,
+      ...(ehPromissoria.value ? { avalista_nome: header.avalistaNome, avalista_documento: header.avalistaDocumento } : {}),
       iof_base: header.iofBase,
       iof_diario: header.iofDiario,
-      checks: itens.value.map(item => ({
+      checks: itens.value.map((item, i) => ({
         valor: item.valor, vencimento: item.vencimento,
-        juros: item.juros, iof: item.iof, liquido: item.liquido,
-        banco: item.banco || '', num_doc: item.num_doc || '', emitente: header.emitenteNome
+        juros: item.juros, iof: item.iof, liquido: item.liquido, tipo: header.tipo,
+        banco: ehPromissoria.value ? '' : (item.banco || ''), num_doc: numeroTitulo(item, i), emitente: emitenteFinal()
       }))
     };
     const resposta = await operationService.create(payload);
@@ -429,7 +473,6 @@ const processarSalvamento = async () => {
       + (resposta.comissao_valor > 0 ? `\nComissão: ${formatCurrency(resposta.comissao_valor)}` : '')
       + (resposta.comissao_valor > 0 && abaterVale.value && valeId.value
         ? ` · ${formatCurrency(comissaoVale.value?.noVale)} descontados do vale #${valeId.value}` : ''));
-    await exportarBordero();
   } catch (error) {
     showPopup('Erro', error.response?.data?.error || "Erro ao salvar.", 'error');
   } finally {
@@ -505,10 +548,23 @@ onMounted(async () => {
         </div>
         <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ modalState.title }}</h3>
         <p class="text-slate-500 text-sm mb-6 whitespace-pre-line">{{ modalState.message }}</p>
-        <div v-if="lastOperationId" class="flex gap-3">
-          <button @click="exportarBordero" data-campo="imprimir-efetivado" class="flex-1 h-10 px-4 bg-white border border-slate-300 text-slate-700 font-semibold text-sm rounded-md shadow-xs hover:bg-slate-50 flex items-center justify-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Imprimir</button>
-          <button @click="novoBordero" data-campo="novo-bordero" class="flex-1 h-10 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs">Novo borderô</button>
-        </div>
+        <template v-if="lastOperationId">
+          <div class="grid gap-2 mb-3" :class="ehPromissoria ? 'grid-cols-2' : 'grid-cols-1'">
+            <button @click="baixar('bordero')" :disabled="!!baixando" data-campo="baixar-bordero"
+                    class="h-10 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-60">
+              <Loader2 v-if="baixando === 'bordero'" class="w-4 h-4 animate-spin" /><FileText v-else class="w-4 h-4" /> Baixar borderô
+            </button>
+            <button v-if="ehPromissoria" @click="baixar('promissorias')" :disabled="!!baixando" data-campo="baixar-promissorias"
+                    class="h-10 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-60">
+              <Loader2 v-if="baixando === 'promissorias'" class="w-4 h-4 animate-spin" /><FileText v-else class="w-4 h-4" /> Promissórias ({{ itens.length }})
+            </button>
+          </div>
+          <div class="flex gap-3">
+            <button @click="exportarBordero" data-campo="imprimir-efetivado" class="flex-1 h-10 px-4 bg-white border border-slate-300 text-slate-700 font-semibold text-sm rounded-md shadow-xs hover:bg-slate-50 flex items-center justify-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Imprimir</button>
+            <button @click="novoBordero" data-campo="novo-bordero" class="flex-1 h-10 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs">Novo borderô</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-4">Fechou sem baixar? O borderô{{ ehPromissoria ? ' e as promissórias' : '' }} também saem pela ficha do cliente e pelo detalhe de cada título.</p>
+        </template>
         <button v-else @click="modalState.visible = false" :class="['w-full h-10 px-4 rounded-md text-white font-semibold text-sm shadow-xs', modalState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700']">Entendido</button>
       </div>
     </div>
@@ -519,7 +575,7 @@ onMounted(async () => {
           <button @click="router.back()" aria-label="Voltar" class="w-9 h-9 flex items-center justify-center bg-white border border-slate-300 shadow-xs hover:bg-slate-50 rounded-md text-slate-500"><ArrowLeft class="w-[18px] h-[18px]" /></button>
           <div>
             <h1 class="text-2xl font-semibold text-slate-900 tracking-tight cursor-help" v-dica="AJUDA['/bordero']">Cálculo de Borderô</h1>
-            <p class="text-slate-500 text-sm mt-0.5">Novo borderô de cheques ou antecipação.</p>
+            <p class="text-slate-500 text-sm mt-0.5">Novo borderô de cheques ou promissórias.</p>
           </div>
         </div>
         <div class="flex gap-2 items-center">
@@ -545,9 +601,15 @@ onMounted(async () => {
       </div>
 
       <section class="bg-white border border-slate-200 rounded-lg shadow-xs relative z-30">
-        <header class="px-5 py-3 border-b border-slate-200">
-          <h2 class="text-sm font-semibold text-slate-900">Dados da operação</h2>
-          <p class="text-xs text-slate-500">Cliente, condições do borderô e de onde sai o dinheiro.</p>
+        <header class="px-5 py-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-900">Dados da operação</h2>
+            <p class="text-xs text-slate-500">Cliente, condições do borderô e de onde sai o dinheiro.</p>
+          </div>
+          <div class="flex h-9 w-full sm:w-64 gap-0.5 p-0.5 rounded-md border border-slate-300 bg-slate-50" role="radiogroup" aria-label="Tipo dos títulos" data-campo="tipo-titulo">
+            <button v-for="t in TIPOS_TITULO" :key="t.id" type="button" role="radio" :aria-checked="header.tipo === t.id"
+                    @click="header.tipo = t.id" :class="segmento(header.tipo === t.id)">{{ t.nome }}</button>
+          </div>
         </header>
         <div class="p-5 space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
@@ -560,7 +622,18 @@ onMounted(async () => {
                 Reputação: <MedidorReputacao :reputacao="header.clienteReputacao" tamanho="mini" />
               </p>
             </div>
-            <div class="xl:col-span-5">
+            <div v-if="ehPromissoria" class="xl:col-span-5 grid grid-cols-1 sm:grid-cols-[1fr_11rem] gap-3" data-campo="avalista">
+              <div>
+                <label for="bordero-avalista" :class="rotulo">Avalista</label>
+                <input id="bordero-avalista" type="text" v-model="header.avalistaNome" maxlength="100" placeholder="Opcional" :class="campo" />
+              </div>
+              <div>
+                <label for="bordero-avalista-doc" :class="rotulo">CPF do avalista</label>
+                <input id="bordero-avalista-doc" type="text" v-model="header.avalistaDocumento" maxlength="20" placeholder="Opcional" :class="campo" />
+              </div>
+              <p class="sm:col-span-2 text-xs text-slate-500 -mt-1">O emitente da promissória é o cliente. Sem avalista, o espaço dele sai em branco para preencher à mão.</p>
+            </div>
+            <div v-else class="xl:col-span-5">
               <label for="bordero-emitente" :class="rotulo">Emitente do cheque</label>
               <input id="bordero-emitente" type="text" v-model="header.emitenteNome" @input="buscarEmitentes" @focus="buscarEmitentes"
                      @blur="conferirEmitente" list="emitentes-ja-usados" autocomplete="off"
@@ -665,8 +738,8 @@ onMounted(async () => {
             <h2 class="text-sm font-semibold text-slate-900">Gerar parcelas</h2>
             <p class="text-xs text-slate-500">
               {{ gerador.modo === 'valor_mao'
-                ? 'Pelo líquido: informe quanto o cliente recebe e o sistema calcula o valor dos cheques.'
-                : 'Pelo bruto: informe a soma dos cheques e o sistema divide em parcelas iguais.' }}
+                ? `Pelo líquido: informe quanto o cliente recebe e o sistema calcula o valor ${ehPromissoria ? 'das promissórias' : 'dos cheques'}.`
+                : `Pelo bruto: informe a soma ${ehPromissoria ? 'das promissórias' : 'dos cheques'} e o sistema divide em parcelas iguais.` }}
             </p>
           </div>
           <div class="flex h-9 w-full sm:w-56 gap-0.5 p-0.5 rounded-md border border-slate-300 bg-slate-50" role="radiogroup" aria-label="Calcular pelo">
@@ -676,7 +749,7 @@ onMounted(async () => {
         </header>
         <div class="p-5 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-12 gap-4 items-end">
           <div class="col-span-2 xl:col-span-3">
-            <label for="gerador-valor" :class="rotulo">{{ gerador.modo === 'valor_mao' ? 'Líquido para o cliente' : 'Soma dos cheques' }}</label>
+            <label for="gerador-valor" :class="rotulo">{{ gerador.modo === 'valor_mao' ? 'Líquido para o cliente' : (ehPromissoria ? 'Soma das promissórias' : 'Soma dos cheques') }}</label>
             <div class="relative">
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400 pointer-events-none">R$</span>
               <input id="gerador-valor" type="number" step="0.01" min="0" v-model="gerador.valorAlvo" @keyup.enter="gerarParcelas" placeholder="0,00" :class="[campo, 'pl-9 font-semibold tabular-nums']" />
@@ -746,11 +819,11 @@ onMounted(async () => {
       <section class="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
         <header class="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-4">
           <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-slate-900">Cheques</h2>
+            <h2 class="text-sm font-semibold text-slate-900">{{ ehPromissoria ? 'Promissórias' : 'Cheques' }}</h2>
             <span class="px-1.5 min-w-5 h-5 inline-flex items-center justify-center rounded bg-slate-100 text-[11px] font-semibold text-slate-600 tabular-nums">{{ itens.length }}</span>
           </div>
           <button @click="adicionarLinha" class="h-8 px-3 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 flex items-center gap-1.5">
-            <Plus class="w-3.5 h-3.5" /> Adicionar cheque
+            <Plus class="w-3.5 h-3.5" /> Adicionar {{ nome.um }}
           </button>
         </header>
         <div class="overflow-x-auto">
@@ -760,11 +833,11 @@ onMounted(async () => {
                 <th class="pl-5 pr-2 py-2 text-left w-10">#</th>
                 <th class="px-2.5 py-2 text-left">Vencimento</th>
                 <th class="px-2.5 py-2 text-right">Dias</th>
-                <th class="px-2.5 py-2 text-right">Valor do cheque</th>
+                <th class="px-2.5 py-2 text-right">{{ ehPromissoria ? 'Valor da promissória' : 'Valor do cheque' }}</th>
                 <th class="px-2.5 py-2 text-right">Juros</th>
                 <th v-if="header.iofEnabled" class="px-2.5 py-2 text-right">IOF</th>
                 <th class="px-2.5 py-2 text-right">Líquido</th>
-                <th class="px-2.5 py-2 text-left">Banco / Nº</th>
+                <th class="px-2.5 py-2 text-left">{{ ehPromissoria ? 'Nº' : 'Banco / Nº' }}</th>
                 <th class="pl-2 pr-5 py-2 w-10"><span class="sr-only">Remover</span></th>
               </tr>
             </thead>
@@ -789,8 +862,8 @@ onMounted(async () => {
                 <td class="px-2.5 py-2 text-right tabular-nums font-semibold text-slate-900 leading-8">{{ formatCurrency(item.liquido) }}</td>
                 <td class="px-2.5 py-2">
                   <div class="flex gap-1.5">
-                    <input type="text" v-model="item.banco" placeholder="Banco" :aria-label="`Banco do cheque ${index + 1}`" :class="[campoTabela, 'w-20']" />
-                    <input type="text" v-model="item.num_doc" placeholder="Nº" :aria-label="`Número do cheque ${index + 1}`" :class="[campoTabela, 'w-16']" />
+                    <input v-if="!ehPromissoria" type="text" v-model="item.banco" placeholder="Banco" :aria-label="`Banco do cheque ${index + 1}`" :class="[campoTabela, 'w-20']" />
+                    <input type="text" v-model="item.num_doc" :placeholder="ehPromissoria ? `${index + 1}/${itens.length}` : 'Nº'" :aria-label="`Número do cheque ${index + 1}`" :class="[campoTabela, 'w-16']" />
                   </div>
                 </td>
                 <td class="pl-2 pr-5 py-2 text-right">
@@ -799,13 +872,13 @@ onMounted(async () => {
               </tr>
               <tr v-if="!itens.length">
                 <td :colspan="header.iofEnabled ? 9 : 8" class="px-5 py-10 text-center text-sm text-slate-400">
-                  Nenhum cheque. Use “Gerar parcelas” acima ou “Adicionar cheque”.
+                  Nenhum{{ ehPromissoria ? 'a promissória' : ' cheque' }}. Use “Gerar parcelas” acima ou “Adicionar {{ nome.um }}”.
                 </td>
               </tr>
             </tbody>
             <tfoot v-if="itens.length" class="bg-slate-50/80 border-t border-slate-200">
               <tr class="font-semibold tabular-nums">
-                <td colspan="3" class="pl-5 pr-3 py-2.5 text-xs font-medium text-slate-500">Total · {{ itens.length }} cheque(s)</td>
+                <td colspan="3" class="pl-5 pr-3 py-2.5 text-xs font-medium text-slate-500">Total · {{ itens.length }} {{ nome.um }}(s)</td>
                 <td class="px-2.5 py-2.5 text-right text-slate-900">{{ formatCurrency(totais.bruto) }}</td>
                 <td class="px-2.5 py-2.5 text-right text-red-600">− {{ formatCurrency(totais.juros) }}</td>
                 <td v-if="header.iofEnabled" class="px-2.5 py-2.5 text-right text-orange-600">− {{ formatCurrency(totais.iof) }}</td>
@@ -860,8 +933,8 @@ onMounted(async () => {
 
           <div class="border-b-2 border-black pb-3 mb-4 flex justify-between items-end gap-6">
             <div>
-              <h1 class="text-3xl font-bold uppercase leading-none">{{ selectedCompany }}</h1>
-              <p class="text-sm text-gray-600 mt-1">Gestão de Ativos</p>
+              <h1 class="text-3xl font-bold uppercase leading-none">{{ empresaAtual.nome }}</h1>
+              <p class="text-sm text-gray-600 mt-1">{{ empresaAtual.cnpj ? `CNPJ ${empresaAtual.cnpj}` : 'Gestão de Ativos' }}</p>
             </div>
             <div class="text-right">
               <h2 class="text-xl font-bold uppercase whitespace-nowrap">Demonstrativo de Borderô</h2>
@@ -884,8 +957,9 @@ onMounted(async () => {
                 </p>
               </div>
               <div class="p-3">
-                <p class="text-[10px] font-semibold uppercase text-gray-500">Emitente dos cheques</p>
-                <p class="font-semibold leading-tight">{{ header.emitenteNome || '—' }}</p>
+                <p class="text-[10px] font-semibold uppercase text-gray-500">Emitente {{ ehPromissoria ? 'das promissórias' : 'dos cheques' }}</p>
+                <p class="font-semibold leading-tight">{{ emitenteFinal() || '—' }}</p>
+                <p v-if="ehPromissoria && header.avalistaNome" class="text-xs text-gray-700 mt-0.5">Avalista: {{ header.avalistaNome }}<template v-if="header.avalistaDocumento"> · CPF/CNPJ: {{ header.avalistaDocumento }}</template></p>
               </div>
             </div>
             <div class="border-t border-gray-300 px-3 py-2 flex flex-wrap gap-x-5 gap-y-0.5 text-xs">
@@ -898,7 +972,7 @@ onMounted(async () => {
           </div>
 
           <p class="text-xs font-semibold uppercase text-gray-600 mb-1">
-            Cheques ({{ itens.length }})<template v-if="prazoMedio"> · prazo médio de {{ prazoMedio }} dias</template>
+            {{ ehPromissoria ? 'Promissórias' : 'Cheques' }} ({{ itens.length }})<template v-if="prazoMedio"> · prazo médio de {{ prazoMedio }} dias</template>
           </p>
           <table class="w-full text-xs border-collapse mb-4">
             <thead>
@@ -918,7 +992,7 @@ onMounted(async () => {
                 <td class="py-1.5 pr-2 text-gray-500">{{ index + 1 }}</td>
                 <td class="py-1.5 pr-2 tabular-nums">{{ dataBR(item.vencimento) || '—' }}</td>
                 <td class="py-1.5 pr-2 text-right tabular-nums">{{ item.dias }}</td>
-                <td class="py-1.5 pl-4 pr-2">{{ item.num_doc || '—' }}</td>
+                <td class="py-1.5 pl-4 pr-2">{{ numeroTitulo(item, index) || '—' }}</td>
                 <td class="py-1.5 pr-2 text-right tabular-nums font-bold">{{ formatCurrency(item.valor) }}</td>
                 <td class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(item.juros) }}</td>
                 <td v-if="header.iofEnabled" class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(item.iof) }}</td>
@@ -952,7 +1026,7 @@ onMounted(async () => {
             </div>
 
             <p class="text-xs mt-5">
-              Declaro que conferi os cheques e os valores acima e estou de acordo com este borderô.
+              Declaro que conferi {{ ehPromissoria ? 'as promissórias' : 'os cheques' }} e os valores acima e estou de acordo com este borderô.
             </p>
             <div class="mt-14 w-[110mm] mx-auto text-center">
               <div class="border-t border-black pt-1.5">

@@ -17,5 +17,10 @@ export default {
 
     create(data) {
         return api.post('/operations', data).then(res => res.data);
+    },
+
+    // o borderô como ficou gravado, para o PDF do borderô e das promissorias
+    documento(id) {
+        return api.get(`/operations/${id}/documento`).then(res => res.data);
     }
 };

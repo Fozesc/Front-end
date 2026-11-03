@@ -26,6 +26,9 @@ const config = ref({
   cnpj: '',
   endereco: '',
   telefone: '',
+  pqNome: '',
+  pqCnpj: '',
+  pqEndereco: '',
   taxaPadrao: 4.00,
   diasCompensacaoPadrao: 2,
   iof_rate: 0.38,
@@ -271,16 +274,25 @@ onMounted(() => {
       
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200/80 h-fit">
         <div class="flex items-center gap-3 mb-5 text-sm text-slate-900 font-semibold border-b border-slate-100 pb-4">
-          <span class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><Building class="w-[18px] h-[18px]" /></span> Dados da empresa
+          <span class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100 flex items-center justify-center"><Building class="w-[18px] h-[18px]" /></span> Empresas
         </div>
+        <p class="text-xs text-slate-500 -mt-2 mb-4">O borderô impresso e as promissórias usam o nome, o CNPJ e o endereço da empresa escolhida no topo do Borderô.</p>
         
-        <div class="space-y-4">
-          <div><label class="block text-[13px] font-medium text-slate-700 mb-1.5">Nome Fantasia</label><input v-model="config.nomeEmpresa" type="text" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
+        <div class="space-y-4" data-campo="empresa-fozesc">
+          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fozesc</h3>
+          <div><label class="block text-[13px] font-medium text-slate-700 mb-1.5">Nome</label><input v-model="config.nomeEmpresa" type="text" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
           <div class="grid grid-cols-2 gap-4">
             <div><label class="block text-[13px] font-medium text-slate-700 mb-1.5">CNPJ</label><input v-model="config.cnpj" type="text" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
             <div><label class="block text-[13px] font-medium text-slate-700 mb-1.5">Telefone</label><input v-model="config.telefone" type="text" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
           </div>
           <div><label class="block text-[13px] font-medium text-slate-700 mb-1.5">Endereço</label><input v-model="config.endereco" type="text" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
+        </div>
+
+        <div class="space-y-4 mt-6 pt-5 border-t border-slate-100" data-campo="empresa-pq">
+          <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">PQ</h3>
+          <div><label for="pq-nome" class="block text-[13px] font-medium text-slate-700 mb-1.5">Nome</label><input id="pq-nome" v-model="config.pqNome" type="text" maxlength="100" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
+          <div><label for="pq-cnpj" class="block text-[13px] font-medium text-slate-700 mb-1.5">CNPJ</label><input id="pq-cnpj" v-model="config.pqCnpj" type="text" maxlength="20" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
+          <div><label for="pq-endereco" class="block text-[13px] font-medium text-slate-700 mb-1.5">Endereço</label><input id="pq-endereco" v-model="config.pqEndereco" type="text" maxlength="200" class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" /></div>
         </div>
       </div>
 

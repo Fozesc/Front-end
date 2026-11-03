@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { X, CreditCard, FileText, History, ArrowRight, Split, Receipt, Layers, Loader2, AlertTriangle, CalendarClock } from 'lucide-vue-next';
+import { X, CreditCard, FileText, History, ArrowRight, Split, Receipt, Layers, Loader2, AlertTriangle, CalendarClock, FileDown } from 'lucide-vue-next';
 import checkService from '../../../services/checkService';
+import { avisarErro } from '../../../utils/avisos';
+import { baixarBorderoPdf, baixarPromissoriasDoBordero } from '../../../utils/documentosBordero';
 
 const props = defineProps({
   cheque: Object,
@@ -16,6 +18,20 @@ const carregando = ref(true);
 const erro = ref('');
 const d = computed(() => ({ ...props.cheque, ...(detalhe.value || {}) }));
 const b = computed(() => detalhe.value?.bordero || null);
+
+const baixando = ref('');
+const baixarDoc = async (qual) => {
+  if (baixando.value) return;
+  baixando.value = qual;
+  try {
+    if (qual === 'bordero') await baixarBorderoPdf(b.value.id);
+    else await baixarPromissoriasDoBordero(b.value.id);
+  } catch (e) {
+    avisarErro(e, `Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}.`);
+  } finally {
+    baixando.value = '';
+  }
+};
 
 onMounted(async () => {
   try {
@@ -167,6 +183,16 @@ const percentual = (valor) => {
           <h3 class="px-4 py-2.5 bg-slate-50 text-xs font-semibold text-slate-600 flex items-center gap-2">
             <FileText class="w-4 h-4" /> Borderô #{{ b.id }}
             <span v-if="b.importado" class="normal-case font-bold text-indigo-600">· importado da planilha</span>
+            <span class="ml-auto flex gap-1.5">
+              <button @click="baixarDoc('bordero')" :disabled="!!baixando" data-campo="titulo-baixar-bordero"
+                      class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
+                <Loader2 v-if="baixando === 'bordero'" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Borderô
+              </button>
+              <button v-if="d.tipo === 'PROMISSORIA'" @click="baixarDoc('promissorias')" :disabled="!!baixando" data-campo="titulo-baixar-promissorias"
+                      class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
+                <Loader2 v-if="baixando === 'promissorias'" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Promissórias
+              </button>
+            </span>
           </h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
             <div><div class="text-xs font-medium text-slate-500">Data da operação</div><div class="font-bold">{{ formatDate(b.data) }}</div>
