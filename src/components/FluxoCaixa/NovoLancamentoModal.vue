@@ -96,7 +96,7 @@ const salvar = () => {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="$emit('close')"></div>
     
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto animate-scale-in">
       
       <div class="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center">
         <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">

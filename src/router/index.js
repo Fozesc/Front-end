@@ -16,6 +16,7 @@ import RelatorioCaixaView from '../views/RelatorioCaixaView.vue'
 import CalendarioView from '../views/CalendarioView.vue'
 import FolhasView from '../views/FolhasView.vue'
 import RecorrentesView from '../views/RecorrentesView.vue'
+import GuiasView from '../views/GuiasView.vue'
 import { gerarPendentes } from '../services/recorrenteService'
 import { lerSessao, sessaoVencida, encerrarSessao } from '../utils/sessao'
 
@@ -110,14 +111,46 @@ const router = createRouter({
       name: 'recorrentes',
       component: RecorrentesView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/guias',
+      name: 'guias',
+      component: GuiasView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/guias/:id(\\d+)',
+      name: 'guia',
+      component: GuiasView,
+      meta: { requiresAuth: true }
     }
   ]
 })
+
+// Aba aberta desde antes de uma atualizacao continua com a tela velha na memoria (foi o que
+// escondeu o campo de senha do caixa depois da 2.11.3). Ao trocar de tela, no maximo 1x por
+// minuto, confere se o servidor ja tem outra versao; se tiver, abre a tela pedida ja atualizada.
+let ultimaConferencia = 0;
+const temVersaoNova = async () => {
+  if (!import.meta.env.PROD || Date.now() - ultimaConferencia < 60000) return false;
+  ultimaConferencia = Date.now();
+  try {
+    const html = await (await fetch('/index.html', { cache: 'no-store' })).text();
+    const script = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+    return !!script && !document.querySelector(`script[src="${script}"]`);
+  } catch {
+    return false;
+  }
+};
 
 /**
  * GUARDA GLOBAL DE AUTENTICAÇÃO
  */
 router.beforeEach(async (to, from, next) => {
+  if (from.name && await temVersaoNova()) {
+    window.location.assign(to.fullPath);
+    return next(false);
+  }
   // 1. Buscamos a chave correta: 'user'. Login vencido (computador aberto de um dia para o
   // outro) sai ja, antes de a pessoa digitar algo na tela.
   if (localStorage.getItem('user') && sessaoVencida(lerSessao())) {
