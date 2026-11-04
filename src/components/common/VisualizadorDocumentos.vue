@@ -1,15 +1,17 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { X, Download, Loader2, ExternalLink, FileText, AlertTriangle } from 'lucide-vue-next';
+import { X, Download, Loader2, ExternalLink, FileText, AlertTriangle, Save } from 'lucide-vue-next';
 
 // Mostra os PDFs na tela antes de baixar. documentos: [{ chave, nome, arquivo, gerar: async () => jsPDF }];
-// cada um so e' montado quando a aba e' aberta.
+// cada um so e' montado quando a aba e' aberta. Com `confirmar` e' uma previa: sem baixar, com o botao que
+// continua (ex: "Efetivar borderô") e o "Voltar e corrigir".
 const props = defineProps({
   titulo: { type: String, default: 'Documentos' },
   documentos: { type: Array, required: true },
   inicial: { type: String, default: '' },
+  confirmar: { type: String, default: '' },
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'confirmar']);
 
 const ativo = ref(props.documentos.some(d => d.chave === props.inicial) ? props.inicial : props.documentos[0]?.chave);
 const gerados = ref({});
@@ -82,6 +84,15 @@ onBeforeUnmount(() => {
           <button @click="abrirEmOutraAba" :disabled="!gerados[ativo]" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-50">
             <ExternalLink class="w-3.5 h-3.5" /> Abrir em outra aba
           </button>
+          <template v-if="confirmar">
+            <button @click="emit('close')" data-campo="previa-voltar" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50">
+              Voltar e corrigir
+            </button>
+            <button @click="emit('confirmar')" data-campo="previa-confirmar" class="h-8 px-3.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs">
+              <Save class="w-3.5 h-3.5" /> {{ confirmar }}
+            </button>
+          </template>
+          <template v-else>
           <button @click="baixar(ativo)" :disabled="!!carregando" data-campo="baixar-este" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-50">
             <Download class="w-3.5 h-3.5" /> Baixar este
           </button>
@@ -89,6 +100,7 @@ onBeforeUnmount(() => {
                   class="h-8 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60">
             <Loader2 v-if="baixandoTodos" class="w-3.5 h-3.5 animate-spin" /><Download v-else class="w-3.5 h-3.5" /> Baixar todos ({{ documentos.length }})
           </button>
+          </template>
         </div>
       </div>
 
@@ -97,7 +109,10 @@ onBeforeUnmount(() => {
         <div v-else-if="erro" class="absolute inset-0 flex flex-col items-center justify-center text-sm text-red-700 gap-2 p-6 text-center"><AlertTriangle class="w-6 h-6" /> {{ erro }}</div>
         <div v-else class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm"><Loader2 class="w-5 h-5 animate-spin mr-2" /> Montando o documento...</div>
       </div>
-      <p v-if="documentos.length > 1" class="px-5 py-2 text-[11px] text-slate-500 border-t border-slate-200">
+      <p v-if="confirmar" class="px-5 py-2 text-xs text-amber-800 bg-amber-50 border-t border-amber-200" data-campo="aviso-previa">
+        <b>Prévia: nada foi gravado ainda.</b> Confira os números. Se algo estiver errado, clique em "Voltar e corrigir", ajuste o borderô e efetive de novo.
+      </p>
+      <p v-else-if="documentos.length > 1" class="px-5 py-2 text-[11px] text-slate-500 border-t border-slate-200">
         Em "Baixar todos" o navegador pode perguntar se permite baixar vários arquivos: clique em <b>Permitir</b> (só na primeira vez).
       </p>
     </div>

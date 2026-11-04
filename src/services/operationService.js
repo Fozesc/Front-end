@@ -19,6 +19,11 @@ export default {
         return api.post('/operations', data).then(res => res.data);
     },
 
+    // contrato e borderô da operação antes de efetivar (mesmo corpo do create; nada e' gravado)
+    previa(data) {
+        return api.post('/operations/previa', data).then(res => res.data);
+    },
+
     // corrige a empresa do borderô (Fozesc ou PQ); os titulos dele vao junto
     mudarEmpresa(id, empresa) {
         return api.put(`/operations/${id}/empresa`, { empresa }).then(res => res.data);

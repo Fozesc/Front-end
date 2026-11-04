@@ -9,7 +9,7 @@ import {
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { avisar } from '../utils/avisos';
-import { documentosDoBordero } from '../utils/documentosBordero';
+import { documentosDoBordero, documentosDoContrato } from '../utils/documentosBordero';
 import VisualizadorDocumentos from '../components/common/VisualizadorDocumentos.vue';
 import operationService from '../services/operationService';
 import checkService from '../services/checkService';
@@ -439,7 +439,14 @@ const verificarLimiteESalvar = () => {
   processarSalvamento();
 };
 
-const processarSalvamento = async () => {
+// Fozesc: antes de gravar mostra o contrato e o borderô da operação montados pelo servidor com os numeros
+// deste borderô (nada e' gravado); "Efetivar borderô" na previa chama de novo com confirmado = true
+const efetivarDaPrevia = () => {
+  visualizador.value = null;
+  processarSalvamento(true);
+};
+
+const processarSalvamento = async (confirmado = false) => {
   limitModal.visible = false;
   loading.value = true;
   try {
@@ -467,6 +474,12 @@ const processarSalvamento = async () => {
         banco: ehPromissoria.value ? '' : (item.banco || ''), num_doc: numeroTitulo(item, i), emitente: emitenteFinal()
       }))
     };
+    if (selectedCompany.value === 'Fozesc' && confirmado !== true) {
+      const previa = await operationService.previa(payload);
+      visualizador.value = { titulo: `Prévia do contrato · Borderô #${previa.bordero.id}`, inicial: 'contrato',
+        documentos: documentosDoContrato(async () => previa, previa.bordero.id), confirmar: 'Efetivar borderô' };
+      return;
+    }
     const resposta = await operationService.create(payload);
     limparRascunho();
     rascunhoRecuperado.value = false;
@@ -575,7 +588,8 @@ onMounted(async () => {
 
     <Teleport to="body">
       <VisualizadorDocumentos v-if="visualizador" :titulo="visualizador.titulo" :documentos="visualizador.documentos"
-                              :inicial="visualizador.inicial" @close="visualizador = null" />
+                              :inicial="visualizador.inicial" :confirmar="visualizador.confirmar || ''"
+                              @close="visualizador = null" @confirmar="efetivarDaPrevia" />
     </Teleport>
 
     <div class="print:hidden space-y-4">
@@ -596,7 +610,7 @@ onMounted(async () => {
             </select>
             <Building2 class="w-4 h-4 absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
           </div>
-          <span v-if="selectedCompany === 'Fozesc'" class="hidden md:inline-flex h-9 items-center px-2.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-semibold" data-campo="aviso-contrato" title="Ao efetivar, o contrato de desconto desta operação é montado sozinho">+ contrato</span>
+          <span v-if="selectedCompany === 'Fozesc'" class="hidden md:inline-flex h-9 items-center px-2.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-semibold" data-campo="aviso-contrato" title="Ao efetivar, aparece a prévia do contrato desta operação para conferir; ele só é gravado depois de confirmar">+ contrato</span>
           <button @click="exportarBordero" class="h-9 px-3.5 bg-white border border-slate-300 rounded-md text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 flex items-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Simular</button>
           <button @click="verificarLimiteESalvar" :disabled="loading" class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold shadow-xs flex items-center gap-2 disabled:opacity-60">
             <Loader2 v-if="loading" class="w-4 h-4 animate-spin" /><Save v-else class="w-4 h-4" /> Efetivar
