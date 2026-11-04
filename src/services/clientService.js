@@ -19,6 +19,11 @@ export default {
     },
 
     // junta dois cadastros do mesmo cliente (exige a senha de quem esta logado)
+    // so cliente sem borderô; exige a senha
+    apagar(id, senha) {
+        return api.delete(`/clients/${id}`, { data: { senha } });
+    },
+
     merge(data) {
         return api.post('/clients/merge', data);
     },

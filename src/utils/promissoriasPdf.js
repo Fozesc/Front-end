@@ -4,6 +4,7 @@
 // O jspdf so carrega no clique.
 import { moeda, dataBR } from './pdfBase.js';
 import { valorPorExtenso } from './extenso.js';
+import { escreverRico } from './textoRico.js';
 
 const dataExtenso = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 const BRANCO = '______________________________________';
@@ -24,23 +25,6 @@ export async function gerarPromissorias({ credor = {}, emitente = {}, avalista =
     doc.setFontSize(tam);
     const linhas = doc.splitTextToSize(String(t ?? ''), largura);
     return linhas.length > 1 ? `${linhas[0].replace(/\s+\S*$/, '')}…` : (linhas[0] || '');
-  };
-
-  // texto que quebra linha sozinho com partes em negrito: [[texto, negrito?], ...]. Devolve quantas linhas usou.
-  const paragrafo = (partes, x, y, largura, tam, entreLinhas) => {
-    doc.setFontSize(tam).setTextColor(20);
-    const palavras = partes.flatMap(([t, negrito], k) => String(t).split(' ').filter(Boolean)
-      .map((palavra, j) => ({ palavra, negrito: !!negrito, colada: j === 0 && /^[,.;:]/.test(t) && k > 0 })));
-    let cx = x, linha = 0;
-    const espaco = () => doc.setFont('helvetica', 'normal').getTextWidth(' ');
-    palavras.forEach((w, i) => {
-      const largPalavra = doc.setFont('helvetica', w.negrito ? 'bold' : 'normal').getTextWidth(w.palavra);
-      const antes = i === 0 || w.colada ? 0 : espaco();
-      if (i > 0 && cx + antes + largPalavra > x + largura) { linha++; cx = x; } else cx += antes;
-      doc.setFont('helvetica', w.negrito ? 'bold' : 'normal').text(w.palavra, cx, y + linha * entreLinhas);
-      cx += largPalavra;
-    });
-    return linha + 1;
   };
 
   parcelas.forEach((p, i) => {
@@ -66,12 +50,12 @@ export async function gerarPromissorias({ credor = {}, emitente = {}, avalista =
     caixa(DIR - 54, 54, 'Valor', moeda(p.valor), 13);
 
     let y = y0 + 32;
-    const linhas = paragrafo([
-      [`No dia ${dataExtenso(p.vencimento)}, pagarei por esta única via de NOTA PROMISSÓRIA a`],
-      [nomeCredor, true],
-      ...(credor.cnpj ? [[', CNPJ'], [credor.cnpj, true]] : []),
-      [', ou à sua ordem, a quantia de:'],
-    ], ESQ, y, LARGURA, 10, 4.6);
+    const linhas = escreverRico(doc, [
+      [`No dia ${dataExtenso(p.vencimento)}, pagarei por esta única via de NOTA PROMISSÓRIA a `, 'normal'],
+      [nomeCredor, 'bold'],
+      ...(credor.cnpj ? [[', CNPJ ', 'normal'], [credor.cnpj, 'bold']] : []),
+      [', ou à sua ordem, a quantia de:', 'normal'],
+    ], ESQ, y, LARGURA, { tam: 10, entreLinhas: 4.6 });
     y += linhas * 4.6 + 0.5;
 
     doc.setFont('helvetica', 'bold').setFontSize(10.5);
@@ -115,9 +99,4 @@ export async function gerarPromissorias({ credor = {}, emitente = {}, avalista =
       ESQ, y0 + 90.5, { tam: 7, cor: 130 });
   });
   return doc;
-}
-
-export async function baixarPromissorias(dados) {
-  const doc = await gerarPromissorias(dados);
-  doc.save(`promissorias-${dados.operacaoId ? `bordero-${dados.operacaoId}` : 'simulacao'}.pdf`);
 }

@@ -1,18 +1,21 @@
 <script setup>
-import { ref, onMounted, reactive, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue';
+import { documentoValido } from '../utils/documento';
 import { AJUDA } from '../utils/ajuda';
 import { avisar, avisarErro } from '../utils/avisos';
+import { ehAdmin } from '../utils/sessao';
 import { useRouter } from 'vue-router'; 
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   Plus, Search, Printer, Edit2, 
   AlertTriangle, X, Loader2,
-  ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone, Merge
+  ArrowLeft, ArrowRight, RotateCcw, User, FileText, Phone, Merge, Trash2
 } from 'lucide-vue-next';
 import clientService from '../services/clientService';
 import { REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 import MesclarClienteModal from '../components/layout/finance/MesclarClienteModal.vue';
+import ApagarClienteModal from '../components/layout/finance/ApagarClienteModal.vue';
 
 const router = useRouter();
 
@@ -31,8 +34,17 @@ const filters = reactive({
 
 const showModal = ref(false); 
 const clienteParaMesclar = ref(null);
+const clienteParaApagar = ref(null);
+const admin = ehAdmin();
 const avisoMerge = ref('');
 const saving = ref(false);
+
+// so para contrato (opcional): pessoa fisica e o representante legal de cliente empresa
+const CAMPOS_PF = [['rg', 'RG / órgão emissor'], ['nacionalidade', 'Nacionalidade'], ['estado_civil', 'Estado civil']];
+const CAMPOS_REP = [['rep_nome', 'Nome'], ['rep_cpf', 'CPF'], ['rep_rg', 'RG / órgão emissor'], ['rep_nacionalidade', 'Nacionalidade'],
+  ['rep_estado_civil', 'Estado civil'], ['rep_endereco', 'Endereço']];
+const vazioContrato = () => Object.fromEntries([...CAMPOS_PF, ...CAMPOS_REP].map(([c]) => [c, '']));
+const temDadosContrato = computed(() => [...CAMPOS_PF, ...CAMPOS_REP].some(([c]) => form.value[c]));
 
 // --- ATUALIZADO: Campos de endereço adicionados ao form ---
 const form = ref({
@@ -47,7 +59,8 @@ const form = ref({
   neighborhood: '',
   city: '',
   state: '',
-  zip_code: ''
+  zip_code: '',
+  ...vazioContrato()
 });
 
 const fetchClientes = async () => {
@@ -120,7 +133,8 @@ const abrirModal = (clienteId = null) => {
       neighborhood: original.neighborhood || '',
       city: original.city || '',
       state: original.state || '',
-      zip_code: original.zip_code || ''
+      zip_code: original.zip_code || '',
+      ...Object.fromEntries(Object.keys(vazioContrato()).map(c => [c, original[c] || '']))
     };
   } else {
     // ATUALIZADO: Reseta os novos campos ao abrir modal vazio
@@ -136,7 +150,8 @@ const abrirModal = (clienteId = null) => {
       neighborhood: '',
       city: '',
       state: '',
-      zip_code: ''
+      zip_code: '',
+      ...vazioContrato()
     };
   }
   showModal.value = true;
@@ -151,6 +166,11 @@ const getLimitColor = (usado, limite) => {
   if (porc >= 100) return 'bg-red-600'; 
   if (porc > 80) return 'bg-amber-500';
   return 'bg-emerald-500';
+};
+const aoApagar = async () => {
+  avisar(`Cliente "${clienteParaApagar.value.name}" apagado.`, 'ok');
+  clienteParaApagar.value = null;
+  await fetchClientes();
 };
 const aoMesclar = async (r) => {
   clienteParaMesclar.value = null;
@@ -272,7 +292,8 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
                 <td class="px-3 py-1.5 text-right">
                   <div class="flex justify-end gap-1">
                     <button @click.stop="abrirModal(cliente.id)" title="Editar cadastro" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"><Edit2 class="w-4 h-4" /></button>
-                    <button @click.stop="clienteParaMesclar = cliente" title="Juntar com outro cadastro do mesmo cliente" class="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"><Merge class="w-4 h-4" /></button>
+                    <button v-if="admin" @click.stop="clienteParaMesclar = cliente" title="Juntar com outro cadastro do mesmo cliente" class="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"><Merge class="w-4 h-4" /></button>
+                    <button v-if="admin && !cliente.cheques_totais" @click.stop="clienteParaApagar = cliente" title="Apagar cliente (sem borderô)" data-campo="apagar-cliente" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 class="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -326,6 +347,7 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
               <div class="relative">
                 <FileText class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input v-model="form.document" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="000.000.000-00" />
+                <p v-if="!documentoValido(form.document)" class="text-xs text-red-600 mt-1" data-campo="aviso-documento">CPF/CNPJ inválido: confira os dígitos</p>
               </div>
             </div>
             <div>
@@ -385,6 +407,28 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
 
             </div>
           </div>
+
+          <details class="pt-2 border-t border-slate-100 group" :open="temDadosContrato" data-campo="dados-contrato">
+            <summary class="pt-3 cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-slate-900">
+              Dados para contrato <span class="text-xs font-normal text-slate-500">opcional · só para cliente com contrato</span>
+            </summary>
+            <p class="text-xs text-slate-500 mt-1 mb-3">Entram sozinhos no contrato. Dá para mudar também direto no contrato.</p>
+            <h5 class="text-xs font-semibold text-slate-600 mb-2">Pessoa física</h5>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              <div v-for="[campo, rotulo] in CAMPOS_PF" :key="campo">
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">{{ rotulo }}</label>
+                <input v-model="form[campo]" type="text" :data-campo="`cliente-${campo}`" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
+              </div>
+            </div>
+            <h5 class="text-xs font-semibold text-slate-600 mb-2">Representante legal (cliente empresa)</h5>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div v-for="[campo, rotulo] in CAMPOS_REP" :key="campo" :class="campo === 'rep_nome' || campo === 'rep_endereco' ? 'md:col-span-3' : ''">
+                <label class="block text-xs font-medium text-slate-600 mb-1.5">{{ rotulo }}</label>
+                <input v-model="form[campo]" type="text" :data-campo="`cliente-${campo}`" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 outline-none text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
+                <p v-if="campo === 'rep_cpf' && !documentoValido(form.rep_cpf)" class="text-xs text-red-600 mt-1">CPF inválido: confira os dígitos</p>
+              </div>
+            </div>
+          </details>
           <div>
             <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Observações</label>
             <textarea v-model="form.notes" rows="3" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg outline-none font-medium text-slate-700 transition-all resize-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs" placeholder="Anotações internas sobre o cliente..."></textarea>
@@ -401,6 +445,8 @@ const notasVisiveis = (n) => (n || '').replace(/\[IMPORT-PLANILHA\]\s*(Criado pe
       </div>
     </div>
 
+    <ApagarClienteModal v-if="clienteParaApagar" :cliente="clienteParaApagar" @close="clienteParaApagar = null"
+                        @apagado="aoApagar" />
     <MesclarClienteModal v-if="clienteParaMesclar" :cliente="clienteParaMesclar"
                          @close="clienteParaMesclar = null" @merged="aoMesclar" />
 

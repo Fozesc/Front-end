@@ -2,10 +2,16 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { X, Trash2, Lock, AlertTriangle, Loader2 } from 'lucide-vue-next';
 import checkService from '../../../services/checkService';
+import operationService from '../../../services/operationService';
 
+// um titulo (cheque) ou o borderô inteiro (bordero: { id, cliente, total, qtd })
 const props = defineProps({
-  cheque: { type: Object, required: true }
+  cheque: { type: Object, default: null },
+  bordero: { type: Object, default: null }
 });
+const servico = props.bordero
+  ? { previa: () => operationService.previaExclusao(props.bordero.id), apagar: (s) => operationService.apagar(props.bordero.id, s) }
+  : { previa: () => checkService.previaExclusao(props.cheque.id), apagar: (s) => checkService.delete(props.cheque.id, s) };
 const emit = defineEmits(['close', 'excluido']);
 
 const previa = ref(null);
@@ -21,10 +27,10 @@ const apagar = async () => {
   if (!senha.value) { erro.value = 'Digite sua senha para confirmar.'; return; }
   apagando.value = true;
   try {
-    await checkService.delete(props.cheque.id, senha.value);
+    await servico.apagar(senha.value);
     emit('excluido');
   } catch (e) {
-    erro.value = e.response?.data?.error || 'Não foi possível apagar o título.';
+    erro.value = e.response?.data?.error || `Não foi possível apagar o ${props.bordero ? 'borderô' : 'título'}.`;
   } finally {
     apagando.value = false;
     senha.value = '';
@@ -35,7 +41,7 @@ const aoTeclar = (e) => { if (e.key === 'Escape') emit('close'); };
 onMounted(async () => {
   window.addEventListener('keydown', aoTeclar);
   try {
-    previa.value = await checkService.previaExclusao(props.cheque.id);
+    previa.value = await servico.previa();
   } catch (e) {
     erro.value = e.response?.data?.error || 'Não foi possível conferir o que muda no caixa.';
   }
@@ -49,8 +55,11 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
     <div class="relative z-10 w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" data-modal="excluir-titulo">
       <div class="border-b border-slate-200 px-6 py-4 flex justify-between items-start">
         <div class="min-w-0">
-          <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2"><Trash2 class="w-5 h-5 text-red-600" /> Apagar título</h2>
-          <p class="text-slate-500 text-sm mt-0.5 truncate">
+          <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2"><Trash2 class="w-5 h-5 text-red-600" /> Apagar {{ bordero ? 'borderô inteiro' : 'título' }}</h2>
+          <p v-if="bordero" class="text-slate-500 text-sm mt-0.5 truncate">
+            Borderô #{{ bordero.id }} · {{ bordero.cliente }} · {{ bordero.qtd === 1 ? '1 título' : `${bordero.qtd} títulos` }} · {{ moeda(bordero.total) }}
+          </p>
+          <p v-else class="text-slate-500 text-sm mt-0.5 truncate">
             Borderô #{{ cheque.operation_id }} · {{ cheque.cliente }} · Doc {{ cheque.num_doc || 'S/N' }} · {{ moeda(cheque.valor_bruto) }}
           </p>
         </div>
@@ -62,7 +71,7 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
           <h3 class="text-[13px] font-medium text-slate-700 mb-1.5">O que muda no caixa</h3>
           <div v-if="!previa && !erro" class="flex items-center gap-2 text-slate-500"><Loader2 class="w-4 h-4 animate-spin" /> Conferindo...</div>
           <template v-else-if="previa">
-            <p v-if="!previa.caixa.length" class="text-slate-600 bg-slate-50 border border-slate-200 rounded-md p-3">Nada: este título não tem lançamento no caixa.</p>
+            <p v-if="!previa.caixa.length" class="text-slate-600 bg-slate-50 border border-slate-200 rounded-md p-3">Nada: {{ bordero ? 'este borderô' : 'este título' }} não tem lançamento no caixa.</p>
             <ul v-else class="divide-y divide-slate-100 border border-slate-200 rounded-md" data-campo="previa-caixa">
               <li v-for="(c, i) in previa.caixa" :key="i" class="px-3 py-2 flex items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -85,7 +94,10 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
             <p v-for="c in previa.vales" :key="c.vale" class="mt-2 text-xs text-violet-800 bg-violet-50 border border-violet-200 rounded-md p-2.5">
               Saem {{ moeda(c.valor) }} do desconto no vale #{{ c.vale }} feito com a comissão: o vale volta a dever esse valor.
             </p>
-            <p v-if="previa.bordero_apagado" class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+            <p v-if="bordero" class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+              Saem o Borderô #{{ previa.bordero }}, {{ previa.titulos === 1 ? 'o título dele' : `os ${previa.titulos} títulos dele` }}, os recebimentos e o contrato, se tiver.
+            </p>
+            <p v-else-if="previa.bordero_apagado" class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
               É o último título: o Borderô #{{ previa.bordero }} também é apagado.
             </p>
           </template>
@@ -110,7 +122,7 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
         <button @click="emit('close')" class="px-4 h-10 bg-white border border-slate-300 text-slate-700 font-semibold rounded-md shadow-xs hover:bg-slate-50 text-sm">Cancelar</button>
         <button @click="apagar" :disabled="!previa || apagando" data-campo="excluir-confirmar"
                 class="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow-xs text-sm flex items-center justify-center gap-2 disabled:opacity-60">
-          <Loader2 v-if="apagando" class="w-4 h-4 animate-spin" /><Trash2 v-else class="w-4 h-4" /> Apagar título
+          <Loader2 v-if="apagando" class="w-4 h-4 animate-spin" /><Trash2 v-else class="w-4 h-4" /> Apagar {{ bordero ? 'borderô' : 'título' }}
         </button>
       </div>
     </div>

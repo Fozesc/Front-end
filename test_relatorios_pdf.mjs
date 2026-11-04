@@ -26,7 +26,8 @@ const dados = {
             por_status: SIT.map(s => ({ status: s, qtd: itens.filter(i => i.situacao === s).length, valor: soma(s) })) },
 };
 const filtros = { search: 'joão', status: ['Aguardando', 'Atrasado', 'Devolvido', 'Juridico'], date_start: '2026-09-01', date_end: '2026-11-30', calculo: '', sort_by: 'due_date', sort_order: 'asc' };
-assert.deepEqual(descreverFiltros({ status: [] }).map(([, v]) => v), ['nenhuma', 'qualquer data', 'todos', 'todos', 'undefined (crescente)']);
+assert.deepEqual(descreverFiltros({ status: [] }).map(([, v]) => v), ['nenhuma', 'qualquer data', 'todos', 'todos', 'Ambas', 'undefined (crescente)']);
+assert.deepEqual(descreverFiltros({ status: [], empresa: 'PQ' }).find(([r]) => r === 'Empresa'), ['Empresa', 'PQ']);
 
 const titulos = await gerarRelatorioTitulosPdf(dados, filtros);
 const t1 = legivel(titulos);

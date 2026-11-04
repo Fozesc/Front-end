@@ -6,6 +6,9 @@ export const lerSessao = () => {
   try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
 };
 
+// apagar borderô, cliente, titulo, lancamento do caixa e vale: so o Admin (o servidor tambem barra)
+export const ehAdmin = () => lerSessao()?.role === 'Admin';
+
 // segundos desde 1970 em que o login vence (null se nao der para ler)
 export const venceEm = (token) => {
   try {

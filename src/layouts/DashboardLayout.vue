@@ -24,7 +24,8 @@ import {
   CalendarDays,
   SquareFunction,
   Repeat,
-  BookOpen
+  BookOpen,
+  FileSignature
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -37,6 +38,7 @@ const secoes = [
     { name: 'Títulos', path: '/cheques', icon: Banknote },
     { name: 'Borderô', path: '/bordero', icon: Calculator },
     { name: 'Clientes', path: '/clientes', icon: Users },
+    { name: 'Contratos', path: '/contratos', icon: FileSignature },
     { name: 'Calendário', path: '/calendario', icon: CalendarDays },
     { name: 'Cálculos', path: '/calculos', icon: SquareFunction },
     { name: 'Guias', path: '/guias', icon: BookOpen }

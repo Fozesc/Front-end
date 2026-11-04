@@ -1,24 +1,26 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { ShieldAlert, Loader2 } from 'lucide-vue-next';
 import checkService from '../../services/checkService';
 import { AJUDA } from '../../utils/ajuda';
 
 // Quem assinou os cheques que estao na rua: quem concentra mais dinheiro (se ele quebrar, quanto
 // vai junto) e quem mais deu problema (devolvido, juridico, vencido sem pagar).
+const props = defineProps({ empresa: { type: String, default: '' } });
 const aba = ref('maiores');
 const dados = ref(null);
 const carregando = ref(true);
 
-onMounted(async () => {
+watch(() => props.empresa, async () => {
+  carregando.value = true;
   try {
-    dados.value = await checkService.riscoEmitentes();
+    dados.value = await checkService.riscoEmitentes(undefined, props.empresa);
   } catch (e) {
     console.error('Erro ao buscar risco por emitente', e);
   } finally {
     carregando.value = false;
   }
-});
+}, { immediate: true });
 
 const linhas = computed(() => dados.value?.[aba.value] || []);
 const moeda = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);

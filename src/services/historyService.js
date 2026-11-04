@@ -6,8 +6,8 @@ export default {
         return api.get('/history/months').then(res => res.data);
     },
     // Detalhe de um mês: saldo por banco, crescimento/perda e lançamentos
-    getMonthDetail(year, month, page = 1) {
-        return api.get(`/history/month/${year}/${month}`, { params: { page } }).then(res => res.data);
+    getMonthDetail(year, month, page = 1, conta = '') {
+        return api.get(`/history/month/${year}/${month}`, { params: { page, conta } }).then(res => res.data);
     },
     // Lucro bruto de todos os meses (grafico)
     getLucro() {

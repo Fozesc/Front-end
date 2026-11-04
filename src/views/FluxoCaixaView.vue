@@ -39,7 +39,7 @@ const saldos = ref({
 }); 
 const capitalTotal = ref(0); 
 
-const filtros = reactive({ texto: '', data: '', tipo: 'todos' });
+const filtros = reactive({ texto: '', data: '', tipo: 'todos', conta: '' });
 
 // Exclusao de lancamento: exige a senha de quem esta logado (o backend confere).
 const confirmModal = reactive({
@@ -62,7 +62,7 @@ const porcentagemCrescimento = computed(() => {
 const carregarTabela = async () => {
   loading.value = true;
   try {
-    const params = { page: currentPage.value, per_page: itemsPerPage, search: filtros.texto, date: filtros.data, type: filtros.tipo };
+    const params = { page: currentPage.value, per_page: itemsPerPage, search: filtros.texto, date: filtros.data, type: filtros.tipo, conta: filtros.conta };
     const res = await transactionService.getAll(params);
     lancamentos.value = res.items.filter(i => i.categoria !== 'Saldo Inicial');
     totalItems.value = res.total;
@@ -85,7 +85,7 @@ watch(() => filtros.texto, () => {
   clearTimeout(timeoutSearch);
   timeoutSearch = setTimeout(() => { currentPage.value = 1; carregarTabela(); }, 400);
 });
-watch([() => filtros.data, () => filtros.tipo], () => { currentPage.value = 1; carregarTabela(); });
+watch([() => filtros.data, () => filtros.tipo, () => filtros.conta], () => { currentPage.value = 1; carregarTabela(); });
 
 const mudarPagina = (p) => { if (p >= 1 && p <= totalPages.value) { currentPage.value = p; carregarTabela(); } };
 
@@ -327,6 +327,14 @@ const linhas = computed(() => {
         <div class="flex gap-3 w-full md:w-auto">
           <input v-model="filtros.texto" type="text" placeholder="Buscar histórico..." class="w-full md:w-64 px-3 py-2 border rounded-lg text-sm outline-none border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
           <input v-model="filtros.data" type="date" class="px-3 py-2 border rounded-lg text-sm outline-none border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow" />
+          <select v-model="filtros.conta" title="Mostrar só uma conta" data-campo="filtro-conta"
+                  class="px-2 py-2 rounded-lg text-sm outline-none border bg-transparent cursor-pointer focus:ring-4 focus:ring-indigo-500/15"
+                  :class="filtros.conta ? 'border-indigo-300 text-indigo-700 font-medium bg-indigo-50' : 'border-transparent text-slate-500 hover:border-slate-200'">
+            <option value="">Todas as contas</option>
+            <option value="DINHEIRO">Dinheiro</option>
+            <option value="BRASIL">BB</option>
+            <option value="CAIXA">Caixa</option>
+          </select>
         </div>
         <div v-if="!loading" class="flex gap-5 text-sm">
           <div class="text-slate-500">Entradas <span class="ml-1 font-semibold text-emerald-600 tabular-nums">{{ formatMoney(resumoFiltro.entradas) }}</span></div>
@@ -412,7 +420,7 @@ const linhas = computed(() => {
               <td class="px-4 py-2.5 text-right">
                 <div class="flex justify-end gap-0.5">
                   <button v-if="item.valor_informativo == null" @click="abrirModalEdicao(item)" title="Editar" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Edit2 class="w-4 h-4"/></button>
-                  <button @click="excluirLancamento(item)" title="Apagar" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
+                  <button v-if="ehAdmin" @click="excluirLancamento(item)" title="Apagar" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                 </div>
               </td>
             </tr>

@@ -6,6 +6,7 @@ import RelatorioModal from '../components/layout/RelatorioModal.vue';
 import AvisosCalendario from '../components/layout/AvisosCalendario.vue';
 import RiscoEmitentes from '../components/layout/RiscoEmitentes.vue';
 import AlertaBackup from '../components/layout/AlertaBackup.vue';
+import AlertaContratos from '../components/layout/AlertaContratos.vue';
 import { 
   Wallet, TrendingUp, AlertTriangle, Calendar, FileText, Users, DollarSign, Activity, Download,
   CalendarClock, X
@@ -32,6 +33,11 @@ const loading = ref(true);
 const showReportModal = ref(false);
 const chartPeriod = ref('meses');
 const chartType = ref('lucro');
+// filtro das empresas: '' = ambas. Fica guardado neste navegador.
+const EMPRESAS_FILTRO = [{ id: '', nome: 'Ambas' }, { id: 'PQ', nome: 'PQ' }, { id: 'Fozesc', nome: 'Fozesc' }];
+let empresaSalva = '';
+try { empresaSalva = localStorage.getItem('fozesc_dashboard_empresa') || ''; } catch { /* aba anonima */ }
+const empresa = ref(EMPRESAS_FILTRO.some(e => e.id === empresaSalva) ? empresaSalva : '');
 
 const kpis = ref({ capital: 0, lucro: 0, inadimplencia: 0, carteira: 0 });
 const proximosVencimentos = ref([]);
@@ -62,7 +68,7 @@ const formatDate = (iso) => iso ? iso.split('-').reverse().join('/').slice(0, 5)
 const fetchDashboard = async () => {
   loading.value = true;
   try {
-    const { data } = await api.get(`/dashboard?period=${chartPeriod.value}`);
+    const { data } = await api.get('/dashboard', { params: { period: chartPeriod.value, ...(empresa.value ? { empresa: empresa.value } : {}) } });
     if (!data?.kpis) throw new Error('resposta inesperada do servidor');
     kpis.value = data.kpis;
     proximosVencimentos.value = data.upcoming;
@@ -87,6 +93,10 @@ const fetchDashboard = async () => {
 };
 
 watch(chartPeriod, () => { fetchDashboard(); });
+watch(empresa, (e) => {
+  try { localStorage.setItem('fozesc_dashboard_empresa', e); } catch { /* aba anonima */ }
+  fetchDashboard();
+});
 onMounted(() => { fetchDashboard(); });
 
 
@@ -255,7 +265,12 @@ const chartOptionsLine = {
         <p class="text-slate-500 text-sm mt-1">Resumo financeiro em tempo real.</p>
       </div>
 
-      <div class="flex gap-2.5">
+      <div class="flex flex-wrap gap-2.5">
+        <div class="flex h-9 bg-slate-100 p-0.5 rounded-lg" role="radiogroup" aria-label="Empresa" data-campo="filtro-empresa">
+          <button v-for="e in EMPRESAS_FILTRO" :key="e.id" @click="empresa = e.id" role="radio" :aria-checked="empresa === e.id"
+                  class="px-3 text-xs font-semibold rounded-md transition-all"
+                  :class="empresa === e.id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'">{{ e.nome }}</button>
+        </div>
         <AvisosCalendario />
         <div class="bg-white h-9 px-3.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 flex items-center shadow-xs">
           <Calendar class="w-4 h-4 mr-2 text-slate-400" /> {{ new Date().toLocaleDateString('pt-BR') }}
@@ -267,6 +282,11 @@ const chartOptionsLine = {
     </div>
 
     <AlertaBackup />
+    <AlertaContratos v-if="empresa !== 'PQ'" />
+
+    <p v-if="empresa" class="mb-4 text-xs text-slate-500" data-campo="aviso-empresa">
+      Mostrando só a <b class="text-slate-700">{{ empresa }}</b>: lucro, carteira, inadimplência, vencimentos e risco são dela. Capital social e a linha do caixa no gráfico são das duas empresas juntas (o caixa é um só).
+    </p>
 
     <div v-if="mostrarAvisoHoje" class="mb-6 bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex items-center gap-4 shadow-xs">
       <div class="w-10 h-10 bg-white text-amber-600 rounded-lg ring-1 ring-inset ring-amber-200 flex items-center justify-center shrink-0"><CalendarClock class="w-5 h-5" /></div>
@@ -440,6 +460,6 @@ const chartOptionsLine = {
       </div>
     </div>
 
-    <RiscoEmitentes class="mt-6" />
+    <RiscoEmitentes class="mt-6" :empresa="empresa" />
   </DashboardLayout>
 </template>

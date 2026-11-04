@@ -19,6 +19,7 @@ const relatorio = ref(null);
 
 const filtro = ref({
   tipo: 'geral',
+  empresa: '',
   inicio: somarDiasLocal(-30),
   fim: hojeLocal()
 });
@@ -39,7 +40,9 @@ const gerar = async () => {
   carregando.value = true;
   erro.value = '';
   try {
-    const { data } = await api.get('/reports/resumo', { params: { ...filtro.value } });
+    // o resumo geral e' o caixa, que e' um so: sempre das duas empresas
+    const { empresa, ...resto } = filtro.value;
+    const { data } = await api.get('/reports/resumo', { params: { ...resto, ...(empresa && resto.tipo !== 'geral' ? { empresa } : {}) } });
     relatorio.value = data;
     await nextTick();
   } catch (e) {
@@ -140,6 +143,14 @@ const larguraCheia = (i) => {
             <option value="lucro">Demonstrativo de Lucros</option>
           </select>
         </div>
+        <div v-if="filtro.tipo !== 'geral'">
+          <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Empresa</label>
+          <select v-model="filtro.empresa" data-campo="relatorio-empresa" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 shadow-xs transition-shadow">
+            <option value="">Ambas</option>
+            <option value="PQ">PQ</option>
+            <option value="Fozesc">Fozesc</option>
+          </select>
+        </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-[13px] font-medium text-slate-700 mb-1.5">De</label>
@@ -188,7 +199,7 @@ const larguraCheia = (i) => {
           <div>
             <h1 class="text-3xl font-bold uppercase tracking-wider">{{ relatorio.empresa }}</h1>
             <p class="text-sm text-gray-500 uppercase mt-1">
-              Relatório Gerencial<span v-if="relatorio.cnpj"> · CNPJ {{ relatorio.cnpj }}</span>
+              Relatório Gerencial<span v-if="relatorio.cnpj"> · CNPJ {{ relatorio.cnpj }}</span><span v-if="!relatorio.filtro_empresa && relatorio.tipo !== 'geral'"> · Fozesc e PQ</span>
             </p>
           </div>
           <div class="text-right">

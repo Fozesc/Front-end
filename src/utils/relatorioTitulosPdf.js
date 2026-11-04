@@ -19,6 +19,7 @@ export function descreverFiltros(f) {
     ['Vencimento', periodo],
     ['Situação', status],
     ['Cálculo', CALCULO[f.calculo || ''] || f.calculo],
+    ['Empresa', f.empresa || 'Ambas'],
     ['Ordem', `${ORDEM[f.sort_by] || f.sort_by} ${f.sort_order === 'desc' ? '(decrescente)' : '(crescente)'}`],
   ];
 }

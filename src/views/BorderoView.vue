@@ -9,7 +9,8 @@ import {
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { avisar } from '../utils/avisos';
-import { baixarBorderoPdf, baixarPromissoriasDoBordero } from '../utils/documentosBordero';
+import { documentosDoBordero } from '../utils/documentosBordero';
+import VisualizadorDocumentos from '../components/common/VisualizadorDocumentos.vue';
 import operationService from '../services/operationService';
 import checkService from '../services/checkService';
 import ClientSelect from '../components/inputs/ClientSelect.vue';
@@ -37,7 +38,8 @@ const segmento = (ativo) => ['flex-1 px-3 rounded-[5px] text-[13px] font-medium 
 const emitidoEm = ref(new Date());
 const loading = ref(false);
 
-const selectedCompany = ref('Fozesc');
+// PQ e' a empresa do dia a dia; a Fozesc e' a dos contratos (escolhida quando precisa)
+const selectedCompany = ref('PQ');
 const lastOperationId = ref(null); 
 const nextOperationId = ref('...'); 
 
@@ -366,20 +368,21 @@ const exportarBordero = async () => {
   window.print();
 };
 
-// downloads do borderô efetivado: so quando a pessoa clica (antes saia sozinho e, fechando o aviso sem
-// querer, perdia). Os dados vem do que foi gravado - os mesmos da ficha do cliente e do titulo.
-const baixando = ref('');
-const baixar = async (qual) => {
-  if (baixando.value) return;
-  baixando.value = qual;
+// documentos do borderô efetivado: o visualizador mostra antes de baixar (borderô, promissorias e, na Fozesc,
+// o contrato gerado sozinho e o borderô da operação). Os dados vem do que foi gravado.
+const visualizador = ref(null);
+const abrindoDocumentos = ref(false);
+const contratoGerado = ref(false);
+const verDocumentos = async (inicial = '') => {
+  if (abrindoDocumentos.value) return;
+  abrindoDocumentos.value = true;
   try {
-    if (qual === 'bordero') await baixarBorderoPdf(lastOperationId.value);
-    else await baixarPromissoriasDoBordero(lastOperationId.value);
+    visualizador.value = { titulo: `Borderô #${lastOperationId.value}`, documentos: await documentosDoBordero(lastOperationId.value), inicial };
   } catch (e) {
     console.error(e);
-    avisar(`Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}. Tente de novo.`);
+    avisar('Não foi possível abrir os documentos. Tente de novo.');
   } finally {
-    baixando.value = '';
+    abrindoDocumentos.value = false;
   }
 };
 
@@ -398,6 +401,8 @@ const novoBordero = () => {
   riscoEmitente.value = null;
   header.comissao = 0;
   header.avalistaNome = ''; header.avalistaDocumento = '';
+  contratoGerado.value = false;
+  visualizador.value = null;
   abaterVale.value = false;
   valeId.value = null;
   lastOperationId.value = null;
@@ -467,12 +472,15 @@ const processarSalvamento = async () => {
     rascunhoRecuperado.value = false;
 
     lastOperationId.value = resposta.id;
+    contratoGerado.value = !!resposta.contrato_gerado;
     // a tela so limpa quando o aviso fecha: tem navegador (Safari) que monta a impressao
     // depois, e ai imprimia a tela ja limpa com o aviso por cima
     showPopup('Sucesso!', `Operação #${resposta.id} realizada!\nLíquido: ${formatCurrency(resposta.total_net)}`
       + (resposta.comissao_valor > 0 ? `\nComissão: ${formatCurrency(resposta.comissao_valor)}` : '')
       + (resposta.comissao_valor > 0 && abaterVale.value && valeId.value
         ? ` · ${formatCurrency(comissaoVale.value?.noVale)} descontados do vale #${valeId.value}` : ''));
+    // Fozesc: o contrato ja vem montado; abre direto nele para conferir
+    if (contratoGerado.value) verDocumentos('contrato');
   } catch (error) {
     showPopup('Erro', error.response?.data?.error || "Erro ao salvar.", 'error');
   } finally {
@@ -487,12 +495,12 @@ const rascunhoRecuperado = ref(false);
 const chaveCliente = ref(0);
 let timerRascunho = null;
 const limparRascunho = () => { try { sessionStorage.removeItem(CHAVE_RASCUNHO); } catch { /* aba anonima */ } };
-watch([() => header, itens, partesSaida], () => {
+watch([() => header, itens, partesSaida, selectedCompany], () => {
   clearTimeout(timerRascunho);
   timerRascunho = setTimeout(() => {
     const temAlgo = header.clienteId || itens.value.some(i => Number(i.valor) > 0);
     try {
-      if (temAlgo) sessionStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ header, itens: itens.value, partes: partesSaida.value }));
+      if (temAlgo) sessionStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ header, itens: itens.value, partes: partesSaida.value, empresa: selectedCompany.value }));
     } catch { /* cheio ou aba anonima: so nao guarda */ }
   }, 400);
 }, { deep: true });
@@ -504,6 +512,7 @@ const recuperarRascunho = () => {
   Object.assign(header, r.header);
   itens.value = r.itens;
   if (Array.isArray(r.partes) && r.partes.length) partesSaida.value = r.partes;
+  if (['PQ', 'Fozesc'].includes(r.empresa)) selectedCompany.value = r.empresa;
   chaveCliente.value++;
   recalcularTudo();
   rascunhoRecuperado.value = true;
@@ -549,25 +558,25 @@ onMounted(async () => {
         <h3 class="text-lg font-semibold text-slate-900 mb-1">{{ modalState.title }}</h3>
         <p class="text-slate-500 text-sm mb-6 whitespace-pre-line">{{ modalState.message }}</p>
         <template v-if="lastOperationId">
-          <div class="grid gap-2 mb-3" :class="ehPromissoria ? 'grid-cols-2' : 'grid-cols-1'">
-            <button @click="baixar('bordero')" :disabled="!!baixando" data-campo="baixar-bordero"
-                    class="h-10 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-60">
-              <Loader2 v-if="baixando === 'bordero'" class="w-4 h-4 animate-spin" /><FileText v-else class="w-4 h-4" /> Baixar borderô
-            </button>
-            <button v-if="ehPromissoria" @click="baixar('promissorias')" :disabled="!!baixando" data-campo="baixar-promissorias"
-                    class="h-10 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-60">
-              <Loader2 v-if="baixando === 'promissorias'" class="w-4 h-4 animate-spin" /><FileText v-else class="w-4 h-4" /> Promissórias ({{ itens.length }})
-            </button>
-          </div>
+          <button @click="verDocumentos()" :disabled="abrindoDocumentos" data-campo="ver-documentos"
+                  class="w-full h-10 mb-3 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 disabled:opacity-60">
+            <Loader2 v-if="abrindoDocumentos" class="w-4 h-4 animate-spin" /><FileText v-else class="w-4 h-4" /> Ver e baixar documentos
+          </button>
+          <p v-if="contratoGerado" class="text-xs text-indigo-700 font-medium -mt-1 mb-3" data-campo="contrato-gerado">Empresa Fozesc: o contrato desta operação já foi gerado.</p>
           <div class="flex gap-3">
             <button @click="exportarBordero" data-campo="imprimir-efetivado" class="flex-1 h-10 px-4 bg-white border border-slate-300 text-slate-700 font-semibold text-sm rounded-md shadow-xs hover:bg-slate-50 flex items-center justify-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Imprimir</button>
             <button @click="novoBordero" data-campo="novo-bordero" class="flex-1 h-10 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-xs">Novo borderô</button>
           </div>
-          <p class="text-xs text-slate-500 mt-4">Fechou sem baixar? O borderô{{ ehPromissoria ? ' e as promissórias' : '' }} também saem pela ficha do cliente e pelo detalhe de cada título.</p>
+          <p class="text-xs text-slate-500 mt-4">Fechou sem baixar? Os documentos também saem pela ficha do cliente e pelo detalhe de cada título.</p>
         </template>
         <button v-else @click="modalState.visible = false" :class="['w-full h-10 px-4 rounded-md text-white font-semibold text-sm shadow-xs', modalState.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700']">Entendido</button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <VisualizadorDocumentos v-if="visualizador" :titulo="visualizador.titulo" :documentos="visualizador.documentos"
+                              :inicial="visualizador.inicial" @close="visualizador = null" />
+    </Teleport>
 
     <div class="print:hidden space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -582,11 +591,12 @@ onMounted(async () => {
           <div class="relative">
             <select v-model="selectedCompany" aria-label="Empresa do borderô"
                     class="appearance-none h-9 pl-3 pr-9 bg-white border border-slate-300 rounded-md text-sm font-semibold text-slate-700 shadow-xs outline-none cursor-pointer focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15">
-              <option value="Fozesc">Fozesc</option>
               <option value="PQ">PQ</option>
+              <option value="Fozesc">Fozesc</option>
             </select>
             <Building2 class="w-4 h-4 absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
           </div>
+          <span v-if="selectedCompany === 'Fozesc'" class="hidden md:inline-flex h-9 items-center px-2.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-semibold" data-campo="aviso-contrato" title="Ao efetivar, o contrato de desconto desta operação é montado sozinho">+ contrato</span>
           <button @click="exportarBordero" class="h-9 px-3.5 bg-white border border-slate-300 rounded-md text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 flex items-center gap-2"><Printer class="w-4 h-4 text-slate-500" /> Simular</button>
           <button @click="verificarLimiteESalvar" :disabled="loading" class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold shadow-xs flex items-center gap-2 disabled:opacity-60">
             <Loader2 v-if="loading" class="w-4 h-4 animate-spin" /><Save v-else class="w-4 h-4" /> Efetivar

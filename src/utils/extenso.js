@@ -27,6 +27,9 @@ const inteiro = (n) => {
   }).join('');
 };
 
+// numero inteiro por extenso: 2026 -> "dois mil e vinte e seis"
+export const numeroPorExtenso = (n) => (Number(n) ? inteiro(Math.floor(Math.abs(Number(n)))) : 'zero');
+
 export function valorPorExtenso(valor) {
   const centavos = Math.round(Math.abs(Number(valor) || 0) * 100);
   const reais = Math.floor(centavos / 100), cent = centavos % 100;
@@ -36,3 +39,17 @@ export function valorPorExtenso(valor) {
   if (cent) partes.push(`${ate999(cent)} ${cent === 1 ? 'centavo' : 'centavos'}`);
   return partes.join(' e ');
 }
+
+// 1 -> "um por cento"; 1.5 -> "um vírgula cinco por cento" (texto das clausulas do contrato)
+export function percentualPorExtenso(valor) {
+  const [inteiro, decimais = ''] = Number(valor || 0).toFixed(2).replace(/0+$/, '').replace(/\.$/, '').split('.');
+  const parte = numeroPorExtenso(Number(inteiro));
+  if (!decimais) return `${parte} por cento`;
+  const zeros = decimais.match(/^0*/)[0].length;
+  return `${parte} vírgula ${'zero '.repeat(zeros)}${numeroPorExtenso(Number(decimais))} por cento`;
+}
+
+// feminino para "vias": 2 -> "duas", 1 -> "uma", 22 -> "vinte e duas"
+export const numeroFemininoPorExtenso = (n) => numeroPorExtenso(n).replace(/\bum\b/g, 'uma').replace(/\bdois\b/g, 'duas')
+  .replace(/entos\b/g, 'entas');
+

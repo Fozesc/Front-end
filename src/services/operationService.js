@@ -19,6 +19,21 @@ export default {
         return api.post('/operations', data).then(res => res.data);
     },
 
+    // corrige a empresa do borderô (Fozesc ou PQ); os titulos dele vao junto
+    mudarEmpresa(id, empresa) {
+        return api.put(`/operations/${id}/empresa`, { empresa }).then(res => res.data);
+    },
+
+    // o que apagar o borderô inteiro muda no caixa (nada e' gravado)
+    previaExclusao(id) {
+        return api.get(`/operations/${id}/exclusao`).then(res => res.data);
+    },
+
+    // apaga o borderô e todos os titulos dele, desfazendo no caixa; exige a senha
+    apagar(id, senha) {
+        return api.delete(`/operations/${id}`, { data: { senha } }).then(res => res.data);
+    },
+
     // o borderô como ficou gravado, para o PDF do borderô e das promissorias
     documento(id) {
         return api.get(`/operations/${id}/documento`).then(res => res.data);

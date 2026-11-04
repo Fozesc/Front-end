@@ -2,8 +2,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { X, CreditCard, FileText, History, ArrowRight, Split, Receipt, Layers, Loader2, AlertTriangle, CalendarClock, FileDown } from 'lucide-vue-next';
 import checkService from '../../../services/checkService';
-import { avisarErro } from '../../../utils/avisos';
-import { baixarBorderoPdf, baixarPromissoriasDoBordero } from '../../../utils/documentosBordero';
+import { avisar, avisarErro, confirmar } from '../../../utils/avisos';
+import operationService from '../../../services/operationService';
+import { documentosDoBordero } from '../../../utils/documentosBordero';
+import VisualizadorDocumentos from '../../common/VisualizadorDocumentos.vue';
 
 const props = defineProps({
   cheque: Object,
@@ -19,17 +21,42 @@ const erro = ref('');
 const d = computed(() => ({ ...props.cheque, ...(detalhe.value || {}) }));
 const b = computed(() => detalhe.value?.bordero || null);
 
-const baixando = ref('');
-const baixarDoc = async (qual) => {
-  if (baixando.value) return;
-  baixando.value = qual;
+// documentos do borderô deste titulo: ver na tela e baixar
+const visualizador = ref(null);
+const abrindoDoc = ref(false);
+const verDocumentos = async () => {
+  if (abrindoDoc.value) return;
+  abrindoDoc.value = true;
   try {
-    if (qual === 'bordero') await baixarBorderoPdf(b.value.id);
-    else await baixarPromissoriasDoBordero(b.value.id);
+    visualizador.value = { titulo: `Borderô #${b.value.id}`, documentos: await documentosDoBordero(b.value.id) };
   } catch (e) {
-    avisarErro(e, `Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}.`);
+    avisarErro(e, 'Não foi possível abrir os documentos do borderô.');
   } finally {
-    baixando.value = '';
+    abrindoDoc.value = false;
+  }
+};
+
+// empresa do borderô: os antigos (antes da 2.13) contam como PQ ate alguem corrigir aqui
+const mudandoEmpresa = ref(false);
+const mudarEmpresa = async (evento) => {
+  const nova = evento.target.value;
+  const atual = b.value.empresa;
+  const ok = await confirmar({
+    titulo: `Passar o borderô #${b.value.id} para a ${nova}?`,
+    mensagem: `Os ${b.value.qtd_titulos} título(s) dele passam a contar na ${nova} (Dashboard, filtros e documentos).`,
+    botao: `Passar para a ${nova}`,
+  });
+  if (!ok) { evento.target.value = atual; return; }
+  mudandoEmpresa.value = true;
+  try {
+    await operationService.mudarEmpresa(b.value.id, nova);
+    detalhe.value = await checkService.detalhes(props.cheque.id);
+    avisar(`Borderô #${b.value.id} agora é da ${nova}.`, 'ok');
+  } catch (e) {
+    evento.target.value = atual;
+    avisarErro(e, 'Não foi possível mudar a empresa.');
+  } finally {
+    mudandoEmpresa.value = false;
   }
 };
 
@@ -184,17 +211,22 @@ const percentual = (valor) => {
             <FileText class="w-4 h-4" /> Borderô #{{ b.id }}
             <span v-if="b.importado" class="normal-case font-bold text-indigo-600">· importado da planilha</span>
             <span class="ml-auto flex gap-1.5">
-              <button @click="baixarDoc('bordero')" :disabled="!!baixando" data-campo="titulo-baixar-bordero"
-                      class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
-                <Loader2 v-if="baixando === 'bordero'" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Borderô
+              <button @click="verDocumentos" :disabled="abrindoDoc" data-campo="titulo-documentos" class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
+                <Loader2 v-if="abrindoDoc" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Ver documentos
               </button>
-              <button v-if="d.tipo === 'PROMISSORIA'" @click="baixarDoc('promissorias')" :disabled="!!baixando" data-campo="titulo-baixar-promissorias"
-                      class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
-                <Loader2 v-if="baixando === 'promissorias'" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Promissórias
-              </button>
+              <RouterLink :to="`/contratos?bordero=${b.id}`" @click="emit('close')" data-campo="titulo-contrato" class="h-7 px-2.5 rounded-md bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-50 flex items-center gap-1 disabled:opacity-60">
+                <FileText class="w-3.5 h-3.5" /> Editar contrato
+              </RouterLink>
             </span>
           </h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
+            <div><div class="text-xs font-medium text-slate-500">Empresa</div>
+              <select :value="b.empresa" @change="mudarEmpresa" :disabled="mudandoEmpresa" data-campo="titulo-empresa" aria-label="Empresa do borderô"
+                      class="mt-0.5 h-8 px-2 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 disabled:opacity-60">
+                <option value="PQ">PQ</option>
+                <option value="Fozesc">Fozesc</option>
+              </select>
+              <div v-if="!b.empresa_gravada" class="text-[10px] text-slate-400">antigo: conta como PQ</div></div>
             <div><div class="text-xs font-medium text-slate-500">Data da operação</div><div class="font-bold">{{ formatDate(b.data) }}</div>
               <div v-if="b.lancado_em && !b.importado" class="text-[10px] text-slate-400">lançado em {{ formatDate(b.lancado_em) }} {{ b.lancado_em.slice(11) }}</div></div>
             <div><div class="text-xs font-medium text-slate-500">Taxa / compensação</div>
@@ -332,6 +364,9 @@ const percentual = (valor) => {
       </div>
     </div>
   </div>
+  <Teleport to="body">
+    <VisualizadorDocumentos v-if="visualizador" :titulo="visualizador.titulo" :documentos="visualizador.documentos" @close="visualizador = null" />
+  </Teleport>
 </template>
 
 <style scoped>

@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'; 
 import { AJUDA } from '../utils/ajuda';
 import { avisarErro } from '../utils/avisos';
+import { ehAdmin } from '../utils/sessao';
 import { useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import ChequeForm from '../components/layout/finance/ChequeForm.vue'; 
@@ -41,6 +42,7 @@ const chequeParaReceber = ref(null);
 const mudancaStatus = ref(null);
 // cheque a apagar: o modal mostra antes o que muda no caixa e pede a senha
 const chequeParaExcluir = ref(null);
+const admin = ehAdmin();
 
 
 const openStatusMenuId = ref(null);
@@ -75,6 +77,7 @@ const filters = reactive({
   date_start: '',
   date_end: '',
   calculo: '',        // '' = todos | 'dentro' = so os que contam | 'fora' = so historico
+  empresa: '',        // '' = as duas | 'PQ' | 'Fozesc' (a do borderô)
   sort_by: 'due_date',
   sort_order: 'asc'
 });
@@ -90,6 +93,7 @@ const paramsDoFiltro = () => ({
   date_start: filters.date_start,
   date_end: filters.date_end,
   calculo: filters.calculo,
+  empresa: filters.empresa,
   sort_by: filters.sort_by,
   sort_order: filters.sort_order
 });
@@ -119,6 +123,7 @@ const carregarDados = async () => {
       date_start: filters.date_start,
       date_end: filters.date_end,
       calculo: filters.calculo,
+      empresa: filters.empresa,
       sort_by: filters.sort_by,
       sort_order: filters.sort_order
     };
@@ -169,7 +174,7 @@ watch(() => filters.search, () => {
   }, 400); 
 });
 
-watch([() => filters.status, () => filters.date_start, () => filters.date_end, () => filters.calculo], () => {
+watch([() => filters.status, () => filters.date_start, () => filters.date_end, () => filters.calculo, () => filters.empresa], () => {
   currentPage.value = 1;
   carregarDados();
 }, { deep: true });
@@ -261,7 +266,7 @@ const toggleStatusMenu = (cheque, event) => {
 
 const resetFilters = () => {
     filters.search = ''; filters.status = [...EM_ABERTO]; filters.date_start = ''; filters.date_end = '';
-    filters.calculo = '';
+    filters.calculo = ''; filters.empresa = '';
     currentPage.value = 1; carregarDados();
 };
 
@@ -306,7 +311,7 @@ const resetFilters = () => {
       </div>
 
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 mb-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-        <div class="md:col-span-3 relative">
+        <div class="md:col-span-2 relative">
           <label class="block text-[13px] font-medium text-slate-700 mb-1.5">Busca</label>
           <Search class="w-4 h-4 absolute left-3 top-[35px] text-slate-400" />
           <input v-model="filters.search" type="text" placeholder="Nome, Banco, Doc..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow" />
@@ -337,6 +342,14 @@ const resetFilters = () => {
             <option value="">Todos</option>
             <option value="dentro">Só os que contam</option>
             <option value="fora">Só histórico (fora)</option>
+          </select>
+        </div>
+        <div class="md:col-span-1">
+          <label for="filtro-empresa" class="block text-[13px] font-medium text-slate-700 mb-1.5">Empresa</label>
+          <select id="filtro-empresa" v-model="filters.empresa" data-campo="filtro-empresa-titulos" class="w-full px-2 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 outline-none shadow-xs transition-shadow">
+            <option value="">Ambas</option>
+            <option value="PQ">PQ</option>
+            <option value="Fozesc">Fozesc</option>
           </select>
         </div>
         <div class="md:col-span-1"><button @click="resetFilters" class="w-full py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-sm font-medium transition-colors">Limpar</button></div>
@@ -398,6 +411,7 @@ const resetFilters = () => {
                 <td class="px-3 py-2.5 whitespace-nowrap align-top">
                   <div class="text-slate-700 tabular-nums">#{{ cheque.operation_id }}</div>
                   <div class="flex gap-1 mt-0.5">
+                    <span class="px-1.5 py-px rounded-md text-[11px] font-semibold" :class="cheque.empresa === 'Fozesc' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'" data-campo="empresa-titulo">{{ cheque.empresa }}</span>
                     <span v-if="cheque.fora_do_calculo" class="px-1.5 py-px rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">fora do cálculo</span>
                     <span v-if="cheque.importado" class="px-1.5 py-px rounded-md border border-slate-200 text-slate-500 text-[11px] font-medium">importado</span>
                   </div>
@@ -415,7 +429,7 @@ const resetFilters = () => {
                             class="p-1.5 rounded-md text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"><HandCoins class="w-4 h-4"/></button>
                     <button v-if="cheque.status !== 'Pago'" @click.stop="abrirProrrogacao(cheque)" title="Prorrogar / receber parte" class="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><CalendarClock class="w-4 h-4"/></button>
                     <button @click.stop="abrirEdicaoCheque(cheque)" title="Editar nome/datas (pede senha)" class="p-1.5 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"><Pencil class="w-4 h-4"/></button>
-                    <button @click.stop="chequeParaExcluir = cheque" title="Excluir" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
+                    <button v-if="admin" @click.stop="chequeParaExcluir = cheque" title="Excluir" class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 class="w-4 h-4"/></button>
                   </div>
                 </td>
               </tr>

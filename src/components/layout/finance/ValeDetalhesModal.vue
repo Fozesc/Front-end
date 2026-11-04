@@ -6,6 +6,7 @@ import settingsService from '../../../services/settingsService';
 import transactionService from '../../../services/transactionService';
 import { CONTAS, ESTILO, arred } from '../../../utils/contasCaixa';
 import { baixarRecibo } from '../../../utils/reciboVale';
+import { ehAdmin } from '../../../utils/sessao';
 
 const props = defineProps({
   valeId: { type: Number, required: true },
@@ -88,7 +89,8 @@ const situacao = computed(() => {
   return { texto: 'Em aberto', cor: 'bg-amber-50 text-amber-700 border-amber-200' };
 });
 
-const apagar = reactive({ ativo: props.iniciarApagando, senha: '', erro: '', salvando: false });
+const admin = ehAdmin();
+const apagar = reactive({ ativo: props.iniciarApagando && admin, senha: '', erro: '', salvando: false });
 const confirmarApagar = async () => {
   if (!apagar.senha) { apagar.erro = 'Digite sua senha para confirmar.'; return; }
   apagar.salvando = true;
@@ -208,7 +210,7 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
                               class="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 transition-colors disabled:opacity-50">
                         <Loader2 v-if="gerando === m.id" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5" /> Recibo
                       </button>
-                      <button @click="pedirDesfazer(m)" title="Desfazer este pagamento" aria-label="Desfazer este pagamento" data-campo="vale-desfazer"
+                      <button v-if="admin" @click="pedirDesfazer(m)" title="Desfazer este pagamento" aria-label="Desfazer este pagamento" data-campo="vale-desfazer"
                               class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Undo2 class="w-4 h-4" /></button>
                     </td>
                   </tr>
@@ -280,7 +282,7 @@ onUnmounted(() => window.removeEventListener('keydown', aoTeclar));
                 class="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg shadow-xs hover:bg-slate-50 hover:text-indigo-700 transition-colors text-sm flex items-center gap-2">
           <Pencil class="w-4 h-4" /> Editar
         </button>
-        <button v-if="v" @click="apagar.ativo = true; desfazer.item = null" data-campo="vale-apagar"
+        <button v-if="v && admin" @click="apagar.ativo = true; desfazer.item = null" data-campo="vale-apagar"
                 class="px-4 py-2.5 bg-white border border-red-200 text-red-600 font-semibold rounded-lg shadow-xs hover:bg-red-50 transition-colors text-sm flex items-center gap-2">
           <Trash2 class="w-4 h-4" /> Apagar
         </button>

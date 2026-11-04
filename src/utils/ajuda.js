@@ -15,8 +15,9 @@ export const AJUDA = {
   '/recorrentes': 'Contas que se repetem (aluguel, luz, internet). Débito automático lança sozinho no caixa no vencimento; a manual espera alguém lançar o valor do mês. Dá para adiar só um vencimento.',
   '/historico': 'Cada mês: saldo de cada conta no fim do mês, entradas, saídas, o lucro bruto com a conta inteira e os lançamentos. "Lucro de todos os meses" abre o gráfico; "Extrato" gera o PDF para os sócios.',
   '/auditoria': 'Quem fez o quê e quando (só o administrador vê): criação, alteração, exclusão, login, senha errada barrada e cada backup, com as falhas em laranja.',
+  '/contratos': 'Contrato de desconto de título de crédito de cada borderô, montado com os dados do cliente, da empresa e dos títulos. Marque "Assinado" (pede a senha) quando o cliente assinar; "Notificação" gera a cobrança dos títulos vencidos com juros de mora e multa. Os números padrão ficam em Ajustes > Contratos.',
   '/guias': 'O passo a passo de cada tarefa, com os sites e as anotações. Um guia pode ter outros guias dentro, como uma playlist. Ao seguir um guia, clique no número de cada passo para marcar o que já fez. A busca acha pelo título, pelos passos e pelas anotações.',
-  '/configuracoes': 'Dados da empresa e taxas padrão (juros, IOF, multa). O administrador também vê a equipe com acesso e, na aba Backups, quem recebe o backup por e-mail.',
+  '/configuracoes': 'Separado em abas: Empresa (dados da Fozesc e da PQ para borderô, promissória e contrato), Taxas (juros, IOF, multa e prorrogação padrão), Contratos (números padrão do contrato), e, só para o administrador, Equipe (quem acessa) e Backups.',
 
   // partes das telas
   sininho: 'Avisos do calendário: o que é de hoje, dos próximos 7 dias e o lembrete (ou valor combinado) que passou sem ser feito. O número vermelho é o que você ainda não viu.',

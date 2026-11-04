@@ -17,6 +17,7 @@ import CalendarioView from '../views/CalendarioView.vue'
 import FolhasView from '../views/FolhasView.vue'
 import RecorrentesView from '../views/RecorrentesView.vue'
 import GuiasView from '../views/GuiasView.vue'
+import ContratosView from '../views/ContratosView.vue'
 import { gerarPendentes } from '../services/recorrenteService'
 import { lerSessao, sessaoVencida, encerrarSessao } from '../utils/sessao'
 
@@ -110,6 +111,12 @@ const router = createRouter({
       path: '/recorrentes',
       name: 'recorrentes',
       component: RecorrentesView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/contratos',
+      name: 'contratos',
+      component: ContratosView,
       meta: { requiresAuth: true }
     },
     {

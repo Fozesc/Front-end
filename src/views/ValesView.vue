@@ -8,6 +8,9 @@ import ValeEditarModal from '../components/layout/finance/ValeEditarModal.vue';
 import { Plus, Loader2, X, HandCoins, Wallet, AlertTriangle, Pencil, Trash2 } from 'lucide-vue-next';
 import valeService from '../services/valeService';
 import { CONTAS, ESTILO } from '../utils/contasCaixa';
+import { ehAdmin } from '../utils/sessao';
+
+const admin = ehAdmin();
 
 const hoje = () => new Date().toLocaleDateString('en-CA');
 
@@ -229,7 +232,7 @@ const formatDate = (d) => d ? d.split('-').reverse().join('/') : '-';
                 </button>
                 <button @click.stop="editando = v" title="Editar vale" aria-label="Editar vale"
                         class="ml-1 p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors align-middle"><Pencil class="w-4 h-4" /></button>
-                <button @click.stop="abrirDetalhe(v, true)" title="Apagar vale" aria-label="Apagar vale"
+                <button v-if="admin" @click.stop="abrirDetalhe(v, true)" title="Apagar vale" aria-label="Apagar vale"
                         class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors align-middle"><Trash2 class="w-4 h-4" /></button>
               </td>
             </tr>

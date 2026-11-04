@@ -47,12 +47,13 @@ const bankStyle = (key) => ({
   DINHEIRO: { icon: Wallet,   color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'border-emerald-100' },
 }[key] || { icon: Wallet, color: 'text-slate-600', bg: 'bg-slate-50', ring: 'border-slate-100' });
 
+const contaLanc = ref('');
 const carregarDetalhe = async (pagina = 1) => {
   const mes = mesAtual.value;
   if (!mes) return;
   loadingDetalhe.value = true;
   try {
-    detalhe.value = await historyService.getMonthDetail(mes.year, mes.month, pagina);
+    detalhe.value = await historyService.getMonthDetail(mes.year, mes.month, pagina, contaLanc.value);
     paginaLanc.value = detalhe.value.lancamentos_pagina || 1;
   } catch (e) {
     console.error('Erro ao carregar mês:', e);
@@ -311,9 +312,19 @@ const irPara = (i) => {
           <h3 class="text-base font-semibold text-slate-900 flex items-center gap-1">
             Lançamentos de <span class="capitalize">{{ detalhe?.label }}</span>
           </h3>
-          <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
-            {{ detalhe?.lancamentos_total || 0 }} lançamentos
-          </span>
+          <div class="flex items-center gap-2">
+            <select v-model="contaLanc" @change="carregarDetalhe(1)" title="Mostrar só uma conta" data-campo="filtro-conta"
+                    class="px-2 py-1 rounded-md text-xs outline-none border bg-transparent cursor-pointer focus:ring-4 focus:ring-indigo-500/15"
+                    :class="contaLanc ? 'border-indigo-300 text-indigo-700 font-medium bg-indigo-50' : 'border-transparent text-slate-500 hover:border-slate-200'">
+              <option value="">Todas as contas</option>
+              <option value="DINHEIRO">Dinheiro</option>
+              <option value="BRASIL">BB</option>
+              <option value="CAIXA">Caixa</option>
+            </select>
+            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
+              {{ detalhe?.lancamentos_total || 0 }} lançamentos
+            </span>
+          </div>
         </div>
 
         <div class="overflow-x-auto">

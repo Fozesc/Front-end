@@ -2,19 +2,23 @@
 import { ref, onMounted, computed } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import { avisar, avisarErro } from '../utils/avisos';
+import { ehAdmin } from '../utils/sessao';
 import { useRoute, useRouter } from 'vue-router';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import { 
   ArrowLeft, Printer, CreditCard, AlertTriangle, 
-  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote, FileDown, Award
+  FileText, CheckCircle, Clock, Check, ChevronDown, ChevronUp, Loader2, MapPin, StickyNote, FileDown, Award, Trash2
 } from 'lucide-vue-next';
+import ExcluirChequeModal from '../components/layout/finance/ExcluirChequeModal.vue';
+import ApagarClienteModal from '../components/layout/finance/ApagarClienteModal.vue';
 import ClienteNotas from '../components/layout/ClienteNotas.vue';
 import RecebimentoModal from '../components/layout/finance/RecebimentoModal.vue';
 import StatusChequeModal from '../components/layout/finance/StatusChequeModal.vue';
 import api from '../services/api';
 import { baixarRelatorioClientePdf } from '../utils/relatorioClientePdf';
 import { baixarFichaClientePdf } from '../utils/fichaClientePdf';
-import { baixarBorderoPdf, baixarPromissoriasDoBordero, temPromissorias } from '../utils/documentosBordero';
+import { documentosDoBordero, temPromissorias } from '../utils/documentosBordero';
+import VisualizadorDocumentos from '../components/common/VisualizadorDocumentos.vue';
 import { LINHAS_REPUTACAO, REGRA_REPUTACAO } from '../utils/reputacao';
 import MedidorReputacao from '../components/common/MedidorReputacao.vue';
 
@@ -58,21 +62,35 @@ const cliente = ref({
 });
 
 const operacoesDoCliente = ref([]); 
-// borderô e promissorias de novo, a qualquer hora (mesmo PDF de quando foi efetivado)
-const baixandoDoc = ref('');
-const baixarDoc = async (op, qual) => {
-  if (baixandoDoc.value) return;
-  baixandoDoc.value = `${op.id}-${qual}`;
+// documentos do borderô (borderô, promissorias, contrato da Fozesc): ver na tela e baixar
+const visualizador = ref(null);
+const abrindoDoc = ref(null);
+const verDocumentos = async (op) => {
+  if (abrindoDoc.value) return;
+  abrindoDoc.value = op.id;
   try {
-    if (qual === 'bordero') await baixarBorderoPdf(op.id);
-    else await baixarPromissoriasDoBordero(op.id);
+    visualizador.value = { titulo: `Borderô #${op.id}`, documentos: await documentosDoBordero(op.id) };
   } catch (e) {
-    avisarErro(e, `Não foi possível baixar ${qual === 'bordero' ? 'o borderô' : 'as promissórias'}.`);
+    avisarErro(e, 'Não foi possível abrir os documentos do borderô.');
   } finally {
-    baixandoDoc.value = '';
+    abrindoDoc.value = null;
   }
 };
 const reputacao = ref(null);
+
+const admin = ehAdmin();
+const borderoParaApagar = ref(null);
+const borderoApagado = () => {
+  avisar(`Borderô #${borderoParaApagar.value.id} apagado.`, 'ok');
+  borderoParaApagar.value = null;
+  carregarTudo();
+};
+
+const apagarCliente = ref(false);
+const clienteApagado = () => {
+  avisar(`Cliente "${cliente.value.nome}" apagado.`, 'ok');
+  router.push('/clientes');
+};
 
 
 // um borderô do servidor no formato da tela (e dos PDFs)
@@ -293,6 +311,8 @@ const exportarFicha = async () => {
                       @close="chequeParaReceber = null" @confirmado="carregarTudo" />
     <StatusChequeModal v-if="mudancaStatus" :cheque="mudancaStatus.cheque" :novoStatus="mudancaStatus.status"
                        :taxaMulta="taxaMulta" @close="mudancaStatus = null" @confirmado="carregarTudo" />
+    <ApagarClienteModal v-if="apagarCliente" :cliente="{ id: Number(route.params.id), nome: cliente.nome }" @close="apagarCliente = false" @apagado="clienteApagado" />
+    <ExcluirChequeModal v-if="borderoParaApagar" :bordero="borderoParaApagar" @close="borderoParaApagar = null" @excluido="borderoApagado" />
     <div class="print:hidden">
       
       <div class="flex justify-between items-center mb-6">
@@ -306,6 +326,11 @@ const exportarFicha = async () => {
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <button v-if="admin && !loading && totalOps === 0" @click="apagarCliente = true" data-campo="apagar-cliente"
+                  title="Só aparece para cliente sem borderô"
+                  class="bg-white border border-slate-300 text-red-600 hover:bg-red-50 hover:border-red-200 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
+            <Trash2 class="w-4 h-4 mr-2" /> Apagar cliente
+          </button>
           <button @click="exportarFicha" :disabled="loading || gerandoFicha" data-campo="ficha-cliente"
                   class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 h-9 px-3.5 rounded-lg text-sm font-semibold shadow-xs flex items-center transition-colors">
             <Loader2 v-if="gerandoFicha" class="w-4 h-4 mr-2 animate-spin text-slate-500" />
@@ -467,13 +492,15 @@ const exportarFicha = async () => {
 
           <div v-if="expandedOps.includes(op.id)" class="border-t border-slate-100 bg-slate-50/60 p-4 animate-fade-in-down">
             <div class="flex flex-wrap justify-end gap-2 mb-3" data-campo="documentos-bordero">
-              <button @click="baixarDoc(op, 'bordero')" :disabled="!!baixandoDoc" data-campo="ficha-baixar-bordero"
-                      class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
-                <Loader2 v-if="baixandoDoc === `${op.id}-bordero`" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5 text-slate-500" /> Baixar borderô
+              <button @click="verDocumentos(op)" :disabled="!!abrindoDoc" data-campo="ficha-documentos" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
+                <Loader2 v-if="abrindoDoc === op.id" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5 text-slate-500" /> Ver documentos
               </button>
-              <button v-if="temPromissorias(op.cheques)" @click="baixarDoc(op, 'promissorias')" :disabled="!!baixandoDoc" data-campo="ficha-baixar-promissorias"
-                      class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
-                <Loader2 v-if="baixandoDoc === `${op.id}-promissorias`" class="w-3.5 h-3.5 animate-spin" /><FileDown v-else class="w-3.5 h-3.5 text-slate-500" /> Baixar promissórias
+              <RouterLink :to="`/contratos?bordero=${op.id}`" data-campo="ficha-contrato" class="h-8 px-3 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-semibold shadow-xs hover:bg-slate-50 flex items-center gap-1.5 disabled:opacity-60">
+                <FileText class="w-3.5 h-3.5 text-slate-500" /> Editar contrato
+              </RouterLink>
+              <button v-if="admin" @click="borderoParaApagar = { id: op.id, cliente: cliente.nome, total: op.total, qtd: op.cheques.length }" data-campo="apagar-bordero"
+                      class="h-8 px-3 rounded-md bg-white border border-slate-300 text-red-600 text-xs font-semibold shadow-xs hover:bg-red-50 hover:border-red-200 flex items-center gap-1.5">
+                <Trash2 class="w-3.5 h-3.5" /> Apagar borderô
               </button>
             </div>
             <table class="w-full text-left text-sm bg-white rounded-lg shadow-xs overflow-visible border border-slate-200">
@@ -533,6 +560,9 @@ const exportarFicha = async () => {
       </div>
     </div>
 
+    <Teleport to="body">
+      <VisualizadorDocumentos v-if="visualizador" :titulo="visualizador.titulo" :documentos="visualizador.documentos" @close="visualizador = null" />
+    </Teleport>
   </DashboardLayout>
 </template>
 
