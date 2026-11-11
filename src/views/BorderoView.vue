@@ -1,6 +1,6 @@
 <script setup>
 import { hojeLocal, somarDiasLocal } from '../utils/datas';
-import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { AJUDA } from '../utils/ajuda';
 import DashboardLayout from '../layouts/DashboardLayout.vue';
 import {
@@ -35,7 +35,6 @@ const campoTabela = 'h-8 rounded-md border border-slate-300 bg-white px-2 text-s
 const segmento = (ativo) => ['flex-1 px-3 rounded-[5px] text-[13px] font-medium transition-colors whitespace-nowrap',
   ativo ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-800'];
 
-const emitidoEm = ref(new Date());
 const loading = ref(false);
 
 // PQ e' a empresa do dia a dia; a Fozesc e' a dos contratos (escolhida quando precisa)
@@ -214,10 +213,6 @@ const totais = computed(() => {
 });
 
 // prazo medio ponderado pelo valor de cada cheque (vai no documento impresso)
-const prazoMedio = computed(() => {
-  const bruto = totais.value.bruto;
-  return bruto > 0 ? Math.round(itens.value.reduce((t, i) => t + Number(i.valor || 0) * Number(i.dias || 0), 0) / bruto) : 0;
-});
 const nomeConta = (id) => CONTAS.find(c => c.id === id)?.nome || id;
 
 // saida dividida (2.11.2): o liquido sai de mais de uma conta, quanto de cada uma. A conta "do
@@ -227,9 +222,6 @@ const partesSaida = ref([]);
 const dividida = computed(() => header.contaSaida === DIVIDIR);
 const contaPrincipal = computed(() => (!dividida.value ? header.contaSaida
   : [...partesSaida.value].sort((a, b) => (Number(b.valor) || 0) - (Number(a.valor) || 0))[0]?.conta || 'Dinheiro'));
-const textoSaida = computed(() => (!dividida.value ? nomeConta(header.contaSaida)
-  : partesSaida.value.map(p => `${p.conta} ${formatCurrency(p.valor)}${p.forma && p.forma !== p.conta ? ` (${p.forma})` : ''}`).join(' + ')));
-const emissao = computed(() => emitidoEm.value.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
 
 const comissaoInvalida = computed(() => {
   const c = Number(header.comissao || 0);
@@ -362,11 +354,7 @@ const adicionarLinha = () => { itens.value.push({ id: Date.now(), vencimento: ''
 const removerLinha = (index) => { itens.value.splice(index, 1); avisoDiaUtil.value = null; recalcularTudo(); };
 const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-const exportarBordero = async () => {
-  emitidoEm.value = new Date();
-  await nextTick();
-  window.print();
-};
+const exportarBordero = () => window.print();
 
 // documentos do borderô efetivado: o visualizador mostra antes de baixar (borderô, promissorias e, na Fozesc,
 // o contrato gerado sozinho e o borderô da operação). Os dados vem do que foi gravado.
@@ -949,120 +937,64 @@ onMounted(async () => {
 
     <!-- Documento impresso (Simular / Efetivar). A tabela de fora so serve para a margem de
          cima e de baixo se repetir em toda pagina quando o borderô passa de uma folha. -->
-    <div class="hidden print:block bg-white text-black">
-      <table class="w-full border-collapse">
-        <thead><tr><td class="h-[10mm] p-0"></td></tr></thead>
-        <tfoot><tr><td class="h-[10mm] p-0"></td></tr></tfoot>
-        <tbody><tr><td class="px-[14mm] py-0 align-top">
+    <div class="hidden print:block bg-white text-black p-8 max-w-[210mm] mx-auto min-h-screen relative">
+      <div class="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
+        <div>
+          <h1 class="text-3xl font-bold uppercase">{{ empresaAtual.nome }}</h1>
+          <p class="text-sm text-gray-600">{{ empresaAtual.cnpj ? `CNPJ ${empresaAtual.cnpj}` : 'Gestão de Ativos' }}</p>
+        </div>
+        <div class="text-right">
+          <h2 class="text-xl font-bold uppercase">Demonstrativo de Borderô</h2>
+          <p v-if="lastOperationId" class="text-base font-bold text-gray-700">Nº {{ lastOperationId }}</p>
+          <p class="text-sm mt-1">Data: {{ dataBR(header.dataOperacao) }}</p>
+        </div>
+      </div>
 
-          <div class="border-b-2 border-black pb-3 mb-4 flex justify-between items-end gap-6">
-            <div>
-              <h1 class="text-3xl font-bold uppercase leading-none">{{ empresaAtual.nome }}</h1>
-              <p class="text-sm text-gray-600 mt-1">{{ empresaAtual.cnpj ? `CNPJ ${empresaAtual.cnpj}` : 'Gestão de Ativos' }}</p>
-            </div>
-            <div class="text-right">
-              <h2 class="text-xl font-bold uppercase whitespace-nowrap">Demonstrativo de Borderô</h2>
-              <p v-if="lastOperationId" class="text-base font-bold">Nº {{ lastOperationId }}</p>
-              <p v-else class="text-sm font-bold text-gray-500 uppercase">Simulação</p>
-              <p class="text-xs mt-0.5">Data da operação: <b>{{ dataBR(header.dataOperacao) }}</b></p>
-              <p class="text-[10px] text-gray-500">Emitido em {{ emissao }}</p>
-            </div>
-          </div>
+      <div class="grid grid-cols-2 gap-8 mb-6 text-sm border border-gray-300 p-4 rounded-lg">
+        <div><p><strong class="uppercase text-gray-500 text-xs">Cliente:</strong></p><p class="text-lg font-bold">{{ header.clienteNome || '---' }}</p></div>
+        <div>
+          <p><strong class="uppercase text-gray-500 text-xs">Taxa:</strong> <span class="font-mono ml-2">{{ header.taxaMensal }}% a.m.</span></p>
+          <p v-if="header.iofEnabled"><strong class="uppercase text-gray-500 text-xs">IOF:</strong> <span class="font-mono ml-2">{{ header.iofBase }}% Fixo + {{ header.iofDiario }}% a.d.</span></p>
+        </div>
+      </div>
 
-          <div class="border border-gray-400 rounded mb-4 text-sm">
-            <div class="grid grid-cols-2 divide-x divide-gray-300">
-              <div class="p-3">
-                <p class="text-[10px] font-semibold uppercase text-gray-500">Cliente</p>
-                <p class="text-lg font-bold leading-tight">{{ header.clienteNome || '—' }}</p>
-                <p v-if="header.clienteDocumento || header.clienteTelefone" class="text-xs text-gray-700 mt-0.5">
-                  <template v-if="header.clienteDocumento">CPF/CNPJ: {{ header.clienteDocumento }}</template>
-                  <template v-if="header.clienteDocumento && header.clienteTelefone"> · </template>
-                  <template v-if="header.clienteTelefone">Tel.: {{ header.clienteTelefone }}</template>
-                </p>
-              </div>
-              <div class="p-3">
-                <p class="text-[10px] font-semibold uppercase text-gray-500">Emitente {{ ehPromissoria ? 'das promissórias' : 'dos cheques' }}</p>
-                <p class="font-semibold leading-tight">{{ emitenteFinal() || '—' }}</p>
-                <p v-if="ehPromissoria && header.avalistaNome" class="text-xs text-gray-700 mt-0.5">Avalista: {{ header.avalistaNome }}<template v-if="header.avalistaDocumento"> · CPF/CNPJ: {{ header.avalistaDocumento }}</template></p>
-              </div>
-            </div>
-            <div class="border-t border-gray-300 px-3 py-2 flex flex-wrap gap-x-5 gap-y-0.5 text-xs">
-              <span><b>Taxa:</b> {{ virgula(header.taxaMensal) }}% a.m.</span>
-              <span><b>Compensação:</b> {{ header.diasCompensacao }} dia(s)</span>
-              <span><b>IOF:</b> <template v-if="header.iofEnabled">{{ virgula(header.iofBase) }}% fixo + {{ virgula(header.iofDiario) }}% a.d.</template><template v-else>não cobrado</template></span>
-              <span><b>Pagamento:</b> {{ textoSaida }}</span>
-              <span v-if="comissao.valor > 0"><b>Comissão:</b> {{ virgula(header.comissao) }} de {{ virgula(header.taxaMensal) }}% ({{ parteDosJuros }} dos juros)</span>
-            </div>
-          </div>
-
-          <p class="text-xs font-semibold uppercase text-gray-600 mb-1">
-            {{ ehPromissoria ? 'Promissórias' : 'Cheques' }} ({{ itens.length }})<template v-if="prazoMedio"> · prazo médio de {{ prazoMedio }} dias</template>
-          </p>
-          <table class="w-full text-xs border-collapse mb-4">
-            <thead>
-              <tr class="border-b-2 border-black text-left">
-                <th class="py-1.5 pr-2 w-6">#</th>
-                <th class="py-1.5 pr-2">Vencimento</th>
-                <th class="py-1.5 pr-2 text-right">Dias</th>
-                <th class="py-1.5 pl-4 pr-2">Nº doc</th>
-                <th class="py-1.5 pr-2 text-right">Valor face</th>
-                <th class="py-1.5 pr-2 text-right">Juros</th>
-                <th v-if="header.iofEnabled" class="py-1.5 pr-2 text-right">IOF</th>
-                <th class="py-1.5 text-right">Líquido</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in itens" :key="item.id" class="border-b border-gray-300 break-inside-avoid">
-                <td class="py-1.5 pr-2 text-gray-500">{{ index + 1 }}</td>
-                <td class="py-1.5 pr-2 tabular-nums">{{ dataBR(item.vencimento) || '—' }}</td>
-                <td class="py-1.5 pr-2 text-right tabular-nums">{{ item.dias }}</td>
-                <td class="py-1.5 pl-4 pr-2">{{ numeroTitulo(item, index) || '—' }}</td>
-                <td class="py-1.5 pr-2 text-right tabular-nums font-bold">{{ formatCurrency(item.valor) }}</td>
-                <td class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(item.juros) }}</td>
-                <td v-if="header.iofEnabled" class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(item.iof) }}</td>
-                <td class="py-1.5 text-right tabular-nums font-bold">{{ formatCurrency(item.liquido) }}</td>
-              </tr>
-              <tr class="border-t-2 border-black font-bold break-inside-avoid">
-                <td colspan="4" class="py-1.5 pr-2">Total</td>
-                <td class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(totais.bruto) }}</td>
-                <td class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(totais.juros) }}</td>
-                <td v-if="header.iofEnabled" class="py-1.5 pr-2 text-right tabular-nums">{{ formatCurrency(totais.iof) }}</td>
-                <td class="py-1.5 text-right tabular-nums">{{ formatCurrency(totais.liquido) }}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <!-- valores + assinatura juntos: nunca ficam separados em paginas diferentes -->
-          <div class="break-inside-avoid">
-            <div class="flex justify-between items-start gap-6">
-              <div class="flex-1 text-xs">
-                <p v-if="header.observacao" class="border border-gray-300 rounded p-2 whitespace-pre-line"><b>Observações:</b> {{ header.observacao }}</p>
-              </div>
-              <div class="w-[85mm] bg-gray-100 rounded p-3 text-sm">
-                <div class="flex justify-between py-0.5"><span>Valor bruto</span><span class="tabular-nums">{{ formatCurrency(totais.bruto) }}</span></div>
-                <div class="flex justify-between py-0.5"><span>(−) Juros</span><span class="tabular-nums">{{ formatCurrency(totais.juros) }}</span></div>
-                <div v-if="header.iofEnabled" class="flex justify-between py-0.5"><span>(−) IOF</span><span class="tabular-nums">{{ formatCurrency(totais.iof) }}</span></div>
-                <div v-if="comissao.valor > 0" class="flex justify-between py-0.5 text-xs text-gray-600"><span>Comissão ({{ parteDosJuros }} dos juros)</span><span class="tabular-nums">{{ formatCurrency(comissao.valor) }}</span></div>
-                <div class="flex justify-between items-baseline mt-1.5 pt-1.5 border-t border-gray-400 text-lg font-bold">
-                  <span>Líquido a Pagar</span><span class="tabular-nums">{{ formatCurrency(totais.liquido) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <p class="text-xs mt-5">
-              Declaro que conferi {{ ehPromissoria ? 'as promissórias' : 'os cheques' }} e os valores acima e estou de acordo com este borderô.
-            </p>
-            <div class="mt-14 w-[110mm] mx-auto text-center">
-              <div class="border-t border-black pt-1.5">
-                <p class="text-sm font-bold uppercase">{{ header.clienteNome || 'Nome do cliente' }}</p>
-                <p v-if="header.clienteDocumento" class="text-xs">CPF/CNPJ: {{ header.clienteDocumento }}</p>
-                <p class="text-xs text-gray-500">Assinatura do cliente</p>
-              </div>
-            </div>
-          </div>
-
-        </td></tr></tbody>
+      <table class="w-full text-left text-xs mb-8 border-collapse">
+        <thead>
+          <tr class="border-b-2 border-black">
+            <th class="py-2">Vencimento</th>
+            <th class="py-2 text-center">Dias</th>
+            <th class="py-2 text-right">Valor Face</th>
+            <th class="py-2 text-right">Juros</th>
+            <th class="py-2 text-right" v-if="header.iofEnabled">IOF</th>
+            <th class="py-2 text-right">Líquido</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in itens" :key="item.id" class="border-b border-gray-200">
+            <td class="py-2 font-mono">{{ dataBR(item.vencimento) }}</td>
+            <td class="py-2 text-center">{{ item.dias }}</td>
+            <td class="py-2 text-right font-bold">{{ formatCurrency(item.valor) }}</td>
+            <td class="py-2 text-right">{{ formatCurrency(item.juros) }}</td>
+            <td class="py-2 text-right" v-if="header.iofEnabled">{{ formatCurrency(item.iof) }}</td>
+            <td class="py-2 text-right font-bold">{{ formatCurrency(item.liquido) }}</td>
+          </tr>
+        </tbody>
       </table>
+
+      <div class="flex justify-end mb-12">
+        <div class="w-1/2 bg-gray-100 p-4 rounded-lg">
+          <div class="flex justify-between text-xl font-bold">
+            <span>Líquido a Pagar:</span>
+            <span>{{ formatCurrency(totais.liquido) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-20 pt-8 border-t border-black w-2/3 mx-auto text-center">
+         <p class="text-sm font-bold uppercase mb-1">{{ header.clienteNome }}</p>
+         <p class="text-xs text-gray-500">Assinatura do Cliente</p>
+      </div>
+
     </div>
   </DashboardLayout>
 </template>
